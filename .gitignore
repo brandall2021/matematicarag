@@ -1,0 +1,15 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.env
+logs/
+node_modules/
+dist/
+.vscode/
+.idea/
+server
+frontend/node_modules/
