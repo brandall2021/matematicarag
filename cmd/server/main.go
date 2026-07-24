@@ -32,17 +32,17 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	r := chi.NewRouter()
+	apiRouter := chi.NewRouter()
 
-	r.Use(chimw.RequestID)
-	r.Use(chimw.RealIP)
-	r.Use(chimw.Logger)
-	r.Use(chimw.Recoverer)
-	r.Use(chimw.Timeout(60 * time.Second))
-	r.Use(middleware.CORS(cfg.CORSOriginsList()))
-	r.Use(middleware.RateLimit(30))
+	apiRouter.Use(chimw.RequestID)
+	apiRouter.Use(chimw.RealIP)
+	apiRouter.Use(chimw.Logger)
+	apiRouter.Use(chimw.Recoverer)
+	apiRouter.Use(chimw.Timeout(60 * time.Second))
+	apiRouter.Use(middleware.CORS(cfg.CORSOriginsList()))
+	apiRouter.Use(middleware.RateLimit(30))
 
-	r.Route("/api", func(r chi.Router) {
+	apiRouter.Route("/api", func(r chi.Router) {
 		r.Route("/auth", api.AuthRoutes(db, cfg))
 		r.Route("/chat", api.ChatRoutes(db, cfg))
 		r.Route("/rag", api.RagRoutes(db, cfg))
@@ -55,7 +55,7 @@ func main() {
 		r.Route("/indexer", api.IndexerRoutes(db, cfg))
 	})
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+	apiRouter.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
@@ -67,14 +67,14 @@ func main() {
 
 	log.Printf("Serving static files from %s", staticDir)
 
-	r.HandleFunc("/*", spaHandler(staticDir))
+	handler := spaHandler(staticDir, apiRouter)
 
 	addr := ":" + cfg.Port
 	log.Printf("Server starting on %s", addr)
 
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      r,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -101,35 +101,27 @@ func main() {
 	log.Println("Server stopped")
 }
 
-func spaHandler(root string) http.HandlerFunc {
-	fs := http.Dir(root)
-	fileServer := http.FileServer(fs)
-
+func spaHandler(root string, fallback http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/health" {
-			http.NotFound(w, r)
+		path := filepath.Clean(r.URL.Path)
+
+		if strings.HasPrefix(path, "/api/") || path == "/health" {
+			fallback.ServeHTTP(w, r)
 			return
 		}
 
-		path := filepath.Clean(r.URL.Path)
-		if path == "/" {
+		if path == "/" || path == "" {
 			path = "/index.html"
 		}
 
 		fullPath := filepath.Join(root, path)
 
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			w.Header().Set("Content-Type", "text/html")
-			http.ServeFile(w, r, filepath.Join(root, "index.html"))
+		if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, fullPath)
 			return
 		}
 
-		if strings.HasSuffix(path, ".js") {
-			w.Header().Set("Content-Type", "application/javascript")
-		} else if strings.HasSuffix(path, ".css") {
-			w.Header().Set("Content-Type", "text/css")
-		}
-
-		fileServer.ServeHTTP(w, r)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		http.ServeFile(w, r, filepath.Join(root, "index.html"))
 	}
 }
