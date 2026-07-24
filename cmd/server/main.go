@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -55,6 +56,7 @@ func main() {
 	})
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
@@ -63,18 +65,12 @@ func main() {
 		staticDir = dir
 	}
 
-	fileServer := http.FileServer(http.Dir(staticDir))
-	r.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/health" {
-			http.NotFound(w, r)
-			return
-		}
-		fileServer.ServeHTTP(w, r)
-	})
+	log.Printf("Serving static files from %s", staticDir)
+
+	r.HandleFunc("/*", spaHandler(staticDir))
 
 	addr := ":" + cfg.Port
 	log.Printf("Server starting on %s", addr)
-	log.Printf("Serving static files from %s", staticDir)
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -103,4 +99,37 @@ func main() {
 	}
 
 	log.Println("Server stopped")
+}
+
+func spaHandler(root string) http.HandlerFunc {
+	fs := http.Dir(root)
+	fileServer := http.FileServer(fs)
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/health" {
+			http.NotFound(w, r)
+			return
+		}
+
+		path := filepath.Clean(r.URL.Path)
+		if path == "/" {
+			path = "/index.html"
+		}
+
+		fullPath := filepath.Join(root, path)
+
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			w.Header().Set("Content-Type", "text/html")
+			http.ServeFile(w, r, filepath.Join(root, "index.html"))
+			return
+		}
+
+		if strings.HasSuffix(path, ".js") {
+			w.Header().Set("Content-Type", "application/javascript")
+		} else if strings.HasSuffix(path, ".css") {
+			w.Header().Set("Content-Type", "text/css")
+		}
+
+		fileServer.ServeHTTP(w, r)
+	}
 }
