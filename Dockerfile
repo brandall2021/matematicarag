@@ -24,7 +24,8 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 
 COPY --from=build /server .
-RUN mkdir -p /app/static && chown -R appuser:appgroup /app
+COPY --from=build /app/static ./static
+RUN chown -R appuser:appgroup /app
 
 USER appuser
 
