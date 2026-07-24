@@ -1,12 +1,12 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
-import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
   selector: 'app-documents',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, MatButtonModule],
   template: `
     <div class="container">
       <h1>Gestion Documental</h1>

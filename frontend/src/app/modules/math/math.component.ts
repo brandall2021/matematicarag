@@ -2,11 +2,12 @@ import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
+import { MatButtonModule } from '@angular/material/button';
 
 @Component({
   selector: 'app-math',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MatButtonModule],
   template: `
     <div class="math-container">
       <h1>Motor Matematico</h1>

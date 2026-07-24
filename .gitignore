@@ -13,3 +13,5 @@ dist/
 .idea/
 server
 frontend/node_modules/
+frontend/.angular/
+frontend/dist/
