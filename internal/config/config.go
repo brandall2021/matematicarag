@@ -20,7 +20,7 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Port:          getEnv("PORT", "8009"),
+		Port:          getEnv("PORT", "8008"),
 		DatabaseURL:   getEnv("DB_URL", "postgresql://localhost:5432/matematica"),
 		JWTSecret:     getEnvRequired("JWT_SECRET"),
 		OpenAIAPIKey:  getEnvRequired("OPENAI_API_KEY"),
