@@ -138,7 +138,7 @@ matematicarag/
 
 ```env
 # Database
-DB_URL=postgresql://user:pass@host:5432/matematicarag
+DB_URL=postgresql://user:pass@host:5432/matematica
 
 # Auth
 JWT_SECRET=base64_encoded_secret_min_32_bytes
@@ -203,7 +203,7 @@ git add -A && git commit -m "feat: initial" && git push
 ### 3. Variables de entorno en Dokploy
 
 ```
-DB_URL=postgresql://brandall:password@186.153.163.188:5432/matematicarag
+DB_URL=postgresql://brandall:Hansol1974+@186.153.163.188:5432/matematica?sslmode=disable
 JWT_SECRET=6r8dzbWWhhRr0FGH+Kqg8S+0K9r7gXJrR0kY7M4gLwTQy2gqzj8YvE3mQ6j5iK8wY4vYbQdR3cL7oX0Q9P2eNQ==
 OPENAI_API_KEY=sk-proj-...
 CORS_ALLOWED_ORIGINS=https://matematica.face-unt.ar
@@ -223,7 +223,7 @@ Para crear los usuarios de ejemplo:
 
 ```bash
 cd scripts
-export DB_URL="postgresql://user:pass@host:5432/matematicarag"
+export DB_URL="postgresql://brandall:Hansol1974+@186.153.163.188:5432/matematica?sslmode=disable"
 go run seed.go
 ```
 
