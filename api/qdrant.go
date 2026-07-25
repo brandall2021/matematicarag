@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	qdrantURL    = "http://sistemas-qdrant-gjlncs:6333"
+	qdrantURL    = "http://sistemas-qdrant-gjlncs-qdrant-1:6333"
 	qdrantAPIKey = "0ylktnefcidr4f6dvkmwfoxc4nrgtywh"
 	collection   = "matematica_chunks"
 )
