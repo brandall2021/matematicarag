@@ -70,6 +70,17 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
+	apiRouter.Get("/health/qdrant", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		body, err := api.QdrantHealthCheck()
+		if err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"error","error":"` + err.Error() + `"}`))
+			return
+		}
+		w.Write(body)
+	})
+
 	staticDir := "./static"
 	if dir := os.Getenv("STATIC_DIR"); dir != "" {
 		staticDir = dir

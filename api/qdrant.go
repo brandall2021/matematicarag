@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"time"
 )
 
 var (
@@ -22,6 +23,15 @@ func init() {
 	if v := os.Getenv("QDRANT_API_KEY"); v != "" {
 		qdrantAPIKey = v
 	}
+	// Try to ensure collection on startup (non-blocking)
+	go func() {
+		time.Sleep(2 * time.Second)
+		if err := ensureQdrantCollection(); err != nil {
+			fmt.Printf("[QDRANT] Collection init failed: %v\n", err)
+		} else {
+			fmt.Printf("[QDRANT] Collection '%s' ready at %s\n", collection, qdrantURL)
+		}
+	}()
 }
 
 type QdrantPoint struct {
@@ -91,6 +101,14 @@ func qdrantRequest(method, path string, body interface{}) ([]byte, error) {
 	}
 
 	return respBody, nil
+}
+
+func QdrantHealthCheck() ([]byte, error) {
+	body, err := qdrantRequest("GET", "/collections/"+collection, nil)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
 }
 
 func ensureQdrantCollection() error {
