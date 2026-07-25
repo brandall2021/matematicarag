@@ -41,6 +41,16 @@ export class ApiService {
     return this.http.get<any[]>(`${this.baseUrl}/documents`);
   }
 
+  uploadDocument(file: File): Observable<any> {
+    const fd = new FormData();
+    fd.append('file', file);
+    return this.http.post(`${this.baseUrl}/documents/upload`, fd);
+  }
+
+  getDocumentChunks(docId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/documents/${docId}/chunks`);
+  }
+
   getHistory(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/history`);
   }
