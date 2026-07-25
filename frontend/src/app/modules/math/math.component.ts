@@ -6,13 +6,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { MathfieldElement } from 'mathlive';
+import { RenderMathPipe } from '../../shared/render-math.pipe';
 
 MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0/fonts';
 
 @Component({
   selector: 'app-math',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule, RenderMathPipe],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <div class="math-container">
@@ -45,7 +46,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
       @if (result()) {
         <div class="result">
           <h3>Resultado:</h3>
-          <pre>{{ result() }}</pre>
+          <div class="result-content" [innerHTML]="result() | renderMath"></div>
         </div>
       }
     </div>
@@ -72,7 +73,10 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
     .latex-preview code { color: var(--accent); font-size: 0.95rem; word-break: break-all; }
     .result { background: var(--surface); padding: 1.5rem; border-radius: 12px; }
     .result h3 { color: var(--accent); margin-top: 0; }
-    pre { white-space: pre-wrap; font-size: 1.1rem; color: var(--text); }
+    .result-content { font-size: 1.1rem; color: var(--text); line-height: 1.6; }
+    .result-content p { margin: 0.5rem 0; }
+    .result-content .katex-display { margin: 1rem 0; overflow-x: auto; }
+    .result-content .katex { font-size: 1.1em; }
   `]
 })
 export class MathComponent implements AfterViewInit, OnDestroy {
