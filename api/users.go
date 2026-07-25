@@ -74,7 +74,7 @@ func UserRoutes(db *pgxpool.Pool) func(r chi.Router) {
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			rows, err := db.Query(r.Context(),
-				`SELECT id, email, name, COALESCE(last_name, ''), role, created_at
+				`SELECT id, email, name, COALESCE(last_name, ''), role, created_at::text
 				 FROM users ORDER BY created_at DESC`)
 			if err != nil {
 				http.Error(w, `{"error":"failed to list users"}`, http.StatusInternalServerError)
@@ -92,9 +92,10 @@ func UserRoutes(db *pgxpool.Pool) func(r chi.Router) {
 			users := make([]UserWithDate, 0)
 			for rows.Next() {
 				var u UserWithDate
-				if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.LastName, &u.Role, &u.CreatedAt); err == nil {
-					users = append(users, u)
+				if err := rows.Scan(&u.ID, &u.Email, &u.Name, &u.LastName, &u.Role, &u.CreatedAt); err != nil {
+					continue
 				}
+				users = append(users, u)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(users)
