@@ -49,6 +49,7 @@ func main() {
 		r.Route("/math", api.MathRoutes())
 		r.Route("/documents", api.DocumentRoutes(db, cfg))
 		r.Route("/history", api.HistoryRoutes(db))
+		r.Route("/analytics", api.AnalyticsRoutes(db))
 		r.Route("/indexer", api.IndexerRoutes(db, cfg))
 
 		r.Group(func(r chi.Router) {
