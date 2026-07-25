@@ -120,7 +120,11 @@ func handleMathOpAI(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, op
 		return
 	}
 
-	systemPrompt := fmt.Sprintf("Sos un experto en matematicas. %s expresiones matematicas. Respondes con el resultado paso a paso en español.", strings.Title(opName))
+	customPrompt := getSetting(db, "MATH_SYSTEM_PROMPT")
+	if customPrompt == "" {
+		customPrompt = fmt.Sprintf("Sos un experto en matematicas. %s expresiones matematicas. Respondes con el resultado paso a paso en español.", strings.Title(opName))
+	}
+	systemPrompt := customPrompt
 	userPrompt := fmt.Sprintf("%s: %s", opName, req.Expression)
 
 	result, err := callOpenAI(db, systemPrompt, userPrompt, "")

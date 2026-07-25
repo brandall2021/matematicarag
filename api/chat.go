@@ -34,7 +34,7 @@ type ChatSession struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-const systemPrompt = `Sos MatematicaRAG, un tutor inteligente de matematicas de la Universidad Nacional de Tucuman (FACE). 
+const defaultChatPrompt = `Sos MatematicaRAG, un tutor inteligente de matematicas de la Universidad Nacional de Tucuman (FACE). 
 Respondes en español, de forma clara y didactica. Explicas conceptos matematicos con ejemplos.
 Si te hacen una pregunta de matematicas, resuelvela paso a paso.
 Si te saludan, responde de forma amigable.
@@ -91,7 +91,11 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 
 			// Build messages with history
-			messages := []OpenAIMessage{{Role: "system", Content: systemPrompt}}
+			customPrompt := getSetting(db, "CHAT_SYSTEM_PROMPT")
+			if customPrompt == "" {
+				customPrompt = defaultChatPrompt
+			}
+			messages := []OpenAIMessage{{Role: "system", Content: customPrompt}}
 			messages = append(messages, history...)
 
 			// Call OpenAI

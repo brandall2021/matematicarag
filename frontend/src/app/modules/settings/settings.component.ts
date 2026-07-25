@@ -88,10 +88,26 @@ interface Setting {
         <div class="section">
           <div class="section-header">
             <h2>API Keys</h2>
-            <button mat-raised-button color="primary" (click)="showNewKey.set(!showNewKey())">
-              <mat-icon>add</mat-icon> Agregar key
-            </button>
+            <div>
+              <button mat-stroked-button (click)="verifyOpenAI()" [disabled]="verifying()">
+                <mat-icon>{{ verifying() ? 'sync' : 'wifi_tethering' }}</mat-icon>
+                {{ verifying() ? 'Verificando...' : 'Verificar conexion' }}
+              </button>
+              <button mat-raised-button color="primary" (click)="showNewKey.set(!showNewKey())" style="margin-left: 0.5rem">
+                <mat-icon>add</mat-icon> Agregar key
+              </button>
+            </div>
           </div>
+
+          @if (verifyResult()) {
+            <div class="verify-result" [class.error]="!verifyOk()">
+              @if (verifyOk()) {
+                <mat-icon>check_circle</mat-icon> Conexion exitosa ({{ verifyResult() }})
+              } @else {
+                <mat-icon>error</mat-icon> {{ verifyResult() }}
+              }
+            </div>
+          }
 
           @if (showNewKey()) {
             <div class="create-form">
@@ -104,6 +120,20 @@ interface Setting {
               </div>
             </div>
           }
+
+          <div class="prompts-section">
+            <h3>Prompts personalizados</h3>
+            <div class="prompt-card">
+              <label>Prompt del Chat (tutor de matematicas)</label>
+              <textarea [(ngModel)]="chatPrompt" placeholder="Sos un tutor de matematicas..." rows="4" class="form-textarea"></textarea>
+              <button mat-raised-button color="primary" (click)="savePrompt('CHAT_SYSTEM_PROMPT', chatPrompt)">Guardar prompt chat</button>
+            </div>
+            <div class="prompt-card">
+              <label>Prompt de Matematica (operaciones avanzadas)</label>
+              <textarea [(ngModel)]="mathPrompt" placeholder="Sos un experto en matematicas..." rows="4" class="form-textarea"></textarea>
+              <button mat-raised-button color="primary" (click)="savePrompt('MATH_SYSTEM_PROMPT', mathPrompt)">Guardar prompt matematica</button>
+            </div>
+          </div>
 
           <div class="settings-list">
             @for (setting of settings(); track setting.key) {
@@ -172,6 +202,15 @@ interface Setting {
     .message { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; background: #1b5e20; color: white; text-align: center; }
     .message.error { background: #b71c1c; }
     .empty { color: var(--text-secondary); text-align: center; padding: 2rem; }
+    .verify-result { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-radius: 8px; background: #1b5e20; color: white; margin-bottom: 1rem; font-size: 0.9rem; }
+    .verify-result.error { background: #b71c1c; }
+    .verify-result mat-icon { font-size: 20px; width: 20px; height: 20px; }
+    .prompts-section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+    .prompts-section h3 { color: var(--text); font-size: 1rem; margin-bottom: 1rem; }
+    .prompt-card { background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+    .prompt-card label { display: block; font-weight: 600; color: var(--text); font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .form-textarea { width: 100%; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 0.9rem; outline: none; font-family: inherit; resize: vertical; }
+    .form-textarea:focus { border-color: var(--accent); }
   `]
 })
 export class SettingsComponent implements OnInit {
@@ -185,6 +224,11 @@ export class SettingsComponent implements OnInit {
   newUser = { name: '', lastName: '', email: '', password: '', role: 'STUDENT' };
   newKey = { key: '', value: '', description: '' };
   showValue: Record<string, boolean> = {};
+  chatPrompt = '';
+  mathPrompt = '';
+  verifying = signal(false);
+  verifyResult = signal('');
+  verifyOk = signal(false);
 
   constructor(private http: HttpClient) {}
 
@@ -201,8 +245,40 @@ export class SettingsComponent implements OnInit {
 
   loadSettings() {
     this.http.get<Setting[]>(`${environment.apiUrl}/api/settings`).subscribe({
-      next: (s) => this.settings.set(s),
+      next: (s) => {
+        this.settings.set(s);
+        const chat = s.find(x => x.key === 'CHAT_SYSTEM_PROMPT');
+        const math = s.find(x => x.key === 'MATH_SYSTEM_PROMPT');
+        if (chat) this.chatPrompt = chat.value;
+        if (math) this.mathPrompt = math.value;
+      },
       error: () => this.showMessage('Error al cargar configuraciones', 'error')
+    });
+  }
+
+  verifyOpenAI() {
+    this.verifying.set(true);
+    this.verifyResult.set('');
+    this.http.post<any>(`${environment.apiUrl}/api/settings/verify-openai`, {}).subscribe({
+      next: (res) => {
+        this.verifying.set(false);
+        this.verifyOk.set(res.ok);
+        this.verifyResult.set(res.ok ? `Modelo: ${res.model}` : res.error);
+      },
+      error: (err) => {
+        this.verifying.set(false);
+        this.verifyOk.set(false);
+        this.verifyResult.set(err.error?.error || 'Error de conexion');
+      }
+    });
+  }
+
+  savePrompt(key: string, value: string) {
+    this.http.put(`${environment.apiUrl}/api/settings/${key}`, {
+      key, value, description: key === 'CHAT_SYSTEM_PROMPT' ? 'Custom chat system prompt' : 'Custom math system prompt'
+    }).subscribe({
+      next: () => this.showMessage('Prompt guardado'),
+      error: () => this.showMessage('Error al guardar prompt', 'error')
     });
   }
 

@@ -46,6 +46,16 @@ func getAPIKey(db *pgxpool.Pool) string {
 	return ""
 }
 
+func getSetting(db *pgxpool.Pool, key string) string {
+	var val string
+	err := db.QueryRow(context.Background(),
+		`SELECT value FROM app_settings WHERE key = $1`, key).Scan(&val)
+	if err == nil {
+		return val
+	}
+	return ""
+}
+
 func callOpenAI(db *pgxpool.Pool, systemPrompt string, userMessage string, model string) (string, error) {
 	apiKey := getAPIKey(db)
 	if apiKey == "" {

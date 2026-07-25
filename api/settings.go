@@ -80,5 +80,30 @@ func SettingsRoutes(db *pgxpool.Pool) func(r chi.Router) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
 		})
+
+		r.Post("/verify-openai", func(w http.ResponseWriter, r *http.Request) {
+			apiKey := getAPIKey(db)
+			if apiKey == "" {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"ok": false, "error": "No hay API key configurada",
+				})
+				return
+			}
+
+			result, err := callOpenAI(db, "Sos un asistente. Respondes SOLO con 'OK'.", "Responde OK", "")
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"ok": false, "error": err.Error(),
+				})
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true, "model": "gpt-3.5-turbo", "response": result,
+			})
+		})
 	}
 }
