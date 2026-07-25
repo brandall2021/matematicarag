@@ -1,14 +1,17 @@
-import { Component, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, AfterViewInit, OnDestroy, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
+import 'mathlive';
 
 @Component({
   selector: 'app-math',
   standalone: true,
   imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <div class="math-container">
       <h1>Motor Matematico</h1>
@@ -21,44 +24,25 @@ import { MatIconModule } from '@angular/material/icon';
         <button mat-raised-button (click)="op.set('factor')" [class.active]="op() === 'factor'">Factorizar</button>
       </div>
 
-      <div class="equation-bar">
-        <div class="bar-group">
-          <span class="bar-label">Basico</span>
-          <div class="bar-buttons">
-            @for (sym of basicSymbols; track sym) {
-              <button class="sym-btn" (click)="insert(sym)">{{ sym }}</button>
-            }
-          </div>
-        </div>
-        <div class="bar-group">
-          <span class="bar-label">Griego</span>
-          <div class="bar-buttons">
-            @for (sym of greekSymbols; track sym) {
-              <button class="sym-btn" (click)="insert(sym)">{{ sym }}</button>
-            }
-          </div>
-        </div>
-        <div class="bar-group">
-          <span class="bar-label">Funciones</span>
-          <div class="bar-buttons">
-            @for (sym of funcSymbols; track sym) {
-              <button class="sym-btn" (click)="insert(sym)">{{ sym }}</button>
-            }
-          </div>
-        </div>
-        <div class="bar-group">
-          <span class="bar-label">Avanzado</span>
-          <div class="bar-buttons">
-            @for (sym of advancedSymbols; track sym) {
-              <button class="sym-btn" (click)="insert(sym)">{{ sym }}</button>
-            }
-          </div>
-        </div>
+      <div class="mathfield-wrapper">
+        <math-field
+          #mathField
+          id="mathfield"
+          virtual-keyboard-mode="auto"
+          smart-fence
+          smart-superscript
+          (input)="onInput($event)"
+          (keydown.enter)="calculate()"
+          class="mathfield-element"
+        ></math-field>
       </div>
 
       <div class="input-area">
-        <input #mathInput [(ngModel)]="expression" placeholder="Escribi tu ecuacion..." class="math-input" (keydown.enter)="calculate()">
-        <button mat-raised-button color="primary" (click)="calculate()" [disabled]="!expression">
+        <div class="latex-preview">
+          <span class="latex-label">LaTeX:</span>
+          <code>{{ latexValue() }}</code>
+        </div>
+        <button mat-raised-button color="primary" (click)="calculate()" [disabled]="!latexValue()">
           <mat-icon>play_arrow</mat-icon> Calcular
         </button>
       </div>
@@ -77,49 +61,80 @@ import { MatIconModule } from '@angular/material/icon';
     .operations { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .operations button { font-size: 0.85rem; }
     .operations button.active { background: var(--accent); color: var(--bg); }
-    .equation-bar { background: var(--surface); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
-    .bar-group { display: flex; align-items: center; gap: 0.5rem; }
-    .bar-label { color: var(--text-secondary); font-size: 0.75rem; width: 70px; flex-shrink: 0; text-transform: uppercase; letter-spacing: 0.5px; }
-    .bar-buttons { display: flex; flex-wrap: wrap; gap: 4px; }
-    .sym-btn { width: 36px; height: 32px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
-    .sym-btn:hover { background: var(--accent); color: var(--bg); border-color: var(--accent); }
-    .input-area { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
-    .math-input { flex: 1; padding: 0.75rem 1rem; border-radius: 8px; border: 2px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 1.2rem; font-family: 'Courier New', monospace; outline: none; }
-    .math-input:focus { border-color: var(--accent); }
+    .mathfield-wrapper { background: var(--surface); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 2px solid var(--border); }
+    .mathfield-wrapper:focus-within { border-color: var(--accent); }
+    .mathfield-element { width: 100%; font-size: 1.4rem; min-height: 60px; }
+    :host ::ng-deep math-field {
+      --math-field-border: none;
+      --math-field-border-radius: 0;
+      --math-field-background: transparent;
+      --math-field-color: var(--text);
+      font-size: 1.4rem;
+    }
+    :host ::ng-deep .ML__virtual-keyboard {
+      background: var(--surface) !important;
+    }
+    .input-area { display: flex; gap: 0.5rem; margin-bottom: 2rem; align-items: center; }
+    .latex-preview { flex: 1; display: flex; align-items: center; gap: 0.5rem; background: var(--surface); padding: 0.75rem 1rem; border-radius: 8px; }
+    .latex-label { color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; }
+    .latex-preview code { color: var(--accent); font-size: 0.95rem; word-break: break-all; }
     .result { background: var(--surface); padding: 1.5rem; border-radius: 12px; }
     .result h3 { color: var(--accent); margin-top: 0; }
     pre { white-space: pre-wrap; font-size: 1.1rem; color: var(--text); }
   `]
 })
-export class MathComponent {
-  @ViewChild('mathInput') mathInput!: ElementRef<HTMLInputElement>;
+export class MathComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('mathField') mathFieldRef!: ElementRef<any>;
 
   expression = '';
   op = signal('evaluate');
   result = signal('');
+  latexValue = signal('');
 
-  basicSymbols = ['+', '-', '*', '/', '^', '(', ')', '=', '|', '!', '%'];
-  greekSymbols = ['α', 'β', 'γ', 'δ', 'ε', 'θ', 'λ', 'μ', 'π', 'σ', 'φ', 'ω', '∞'];
-  funcSymbols = ['sin', 'cos', 'tan', 'log', 'ln', 'sqrt', 'abs', 'exp', 'asin', 'acos', 'atan'];
-  advancedSymbols = ['∫', '∑', '∏', '√', '∂', '∇', '≤', '≥', '≠', '≈', '±', '×', '÷'];
+  private mf: any = null;
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private zone: NgZone) {}
 
-  insert(sym: string) {
-    const input = this.mathInput.nativeElement;
-    const start = input.selectionStart || this.expression.length;
-    const end = input.selectionEnd || this.expression.length;
-    this.expression = this.expression.slice(0, start) + sym + this.expression.slice(end);
+  ngAfterViewInit() {
     setTimeout(() => {
-      input.focus();
-      input.setSelectionRange(start + sym.length, start + sym.length);
+      this.mf = this.mathFieldRef.nativeElement;
+      if (this.mf) {
+        this.mf.addEventListener('input', this.handleInput);
+      }
+    }, 100);
+  }
+
+  ngOnDestroy() {
+    if (this.mf) {
+      this.mf.removeEventListener('input', this.handleInput);
+    }
+  }
+
+  private handleInput = () => {
+    this.zone.run(() => {
+      if (this.mf) {
+        this.latexValue.set(this.mf.value || '');
+      }
     });
+  };
+
+  onInput(event: any) {
+    const val = event.target?.value || this.mf?.value || '';
+    this.latexValue.set(val);
   }
 
   calculate() {
-    if (!this.expression) return;
-    this.api.mathEvaluate(this.expression).subscribe(res => {
-      this.result.set(res.result || res.error);
+    const expr = this.latexValue();
+    if (!expr) return;
+
+    const endpoint = this.op();
+    this.api.mathOperation(endpoint, expr).subscribe({
+      next: (res: any) => {
+        this.result.set(res.result || res.error || 'Sin resultado');
+      },
+      error: (err: any) => {
+        this.result.set(err.error?.error || 'Error al calcular');
+      }
     });
   }
 }

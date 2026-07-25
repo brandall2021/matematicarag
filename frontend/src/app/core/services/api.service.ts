@@ -29,6 +29,10 @@ export class ApiService {
     return this.http.post(`${this.baseUrl}/math/evaluate`, { expression });
   }
 
+  mathOperation(operation: string, expression: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/math/${operation}`, { expression });
+  }
+
   mathPlot(expression: string, xMin: number, xMax: number): Observable<any> {
     return this.http.post(`${this.baseUrl}/math/plot`, { expression, xMin, xMax });
   }
