@@ -1,8 +1,10 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/brandall2021/matematicarag/internal/config"
@@ -65,10 +67,10 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				req.SessionID = sessionID
 			}
 
-			_, err := db.QueryRow(r.Context(),
-				`INSERT INTO chat_messages (session_id, role, content, model) VALUES ($1, 'USER', $2, $3) RETURNING id`,
+			_, err := db.Exec(r.Context(),
+				`INSERT INTO chat_messages (session_id, role, content, model) VALUES ($1, 'USER', $2, $3)`,
 				req.SessionID, req.Content, req.Model,
-			).Result()
+			)
 			if err != nil {
 				http.Error(w, `{"error":"failed to save message"}`, http.StatusInternalServerError)
 				return
