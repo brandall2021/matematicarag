@@ -49,10 +49,19 @@ func main() {
 		r.Route("/math", api.MathRoutes())
 		r.Route("/documents", api.DocumentRoutes(db, cfg))
 		r.Route("/history", api.HistoryRoutes(db))
-		r.Route("/settings", api.SettingsRoutes(db))
-		r.Route("/stats", api.StatsRoutes(db))
-		r.Route("/analytics", api.AnalyticsRoutes(db))
 		r.Route("/indexer", api.IndexerRoutes(db, cfg))
+
+		r.Group(func(r chi.Router) {
+			r.Use(api.AuthMiddleware(cfg.JWTSecret))
+			r.Route("/users", api.UserRoutes(db))
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(api.AuthMiddleware(cfg.JWTSecret))
+			r.Use(api.RoleMiddleware("ADMIN"))
+			r.Route("/settings", api.SettingsRoutes(db))
+			r.Route("/stats", api.StatsRoutes(db))
+		})
 	})
 
 	apiRouter.Get("/health", func(w http.ResponseWriter, r *http.Request) {

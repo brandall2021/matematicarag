@@ -41,14 +41,14 @@ import { MatButtonModule } from '@angular/material/button';
     </div>
   `,
   styles: [`
-    .auth-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #1a1a2e; }
-    .auth-card { background: #16213e; padding: 2rem; border-radius: 12px; width: 400px; }
-    h1 { color: #e2b714; text-align: center; font-family: 'Newsreader', serif; }
-    .subtitle { color: #888; text-align: center; margin-bottom: 2rem; }
+    .auth-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--bg); }
+    .auth-card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 400px; }
+    h1 { color: var(--accent); text-align: center; font-family: 'Newsreader', serif; }
+    .subtitle { color: var(--text-secondary); text-align: center; margin-bottom: 2rem; }
     .full-width { width: 100%; }
     .error-message { color: #f44336; text-align: center; margin-bottom: 1rem; }
-    .switch-text { color: #888; text-align: center; margin-top: 1rem; }
-    a { color: #e2b714; }
+    .switch-text { color: var(--text-secondary); text-align: center; margin-top: 1rem; }
+    a { color: var(--accent); }
   `]
 })
 export class RegisterComponent {

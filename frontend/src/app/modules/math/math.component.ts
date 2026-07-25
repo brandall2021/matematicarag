@@ -32,15 +32,15 @@ import { MatButtonModule } from '@angular/material/button';
     </div>
   `,
   styles: [`
-    .math-container { padding: 2rem; max-width: 800px; margin: 0 auto; background: #1a1a2e; color: white; min-height: 100vh; }
-    h1 { color: #e2b714; font-family: 'Newsreader', serif; }
+    .math-container { padding: 2rem; max-width: 800px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
+    h1 { color: var(--accent); font-family: 'Newsreader', serif; }
     .operations { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
-    .operations button.active { background: #e2b714; color: #1a1a2e; }
+    .operations button.active { background: var(--accent); color: var(--bg); }
     .input-area { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
-    .math-input { flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid #2a2a4a; background: #16213e; color: white; font-size: 1.1rem; outline: none; }
-    .math-input:focus { border-color: #e2b714; }
-    .result { background: #16213e; padding: 1.5rem; border-radius: 12px; }
-    pre { white-space: pre-wrap; font-size: 1.1rem; }
+    .math-input { flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 1.1rem; outline: none; }
+    .math-input:focus { border-color: var(--accent); }
+    .result { background: var(--surface); padding: 1.5rem; border-radius: 12px; }
+    pre { white-space: pre-wrap; font-size: 1.1rem; color: var(--text); }
   `]
 })
 export class MathComponent {

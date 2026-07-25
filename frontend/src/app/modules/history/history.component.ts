@@ -20,9 +20,9 @@ import { ApiService } from '../../core/services/api.service';
     </div>
   `,
   styles: [`
-    .container { padding: 2rem; max-width: 800px; margin: 0 auto; background: #1a1a2e; color: white; min-height: 100vh; }
-    h1 { color: #e2b714; }
-    .history-item { background: #16213e; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; }
+    .container { padding: 2rem; max-width: 800px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
+    h1 { color: var(--accent); }
+    .history-item { background: var(--surface); padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; }
     .empty-state { text-align: center; margin-top: 3rem; }
   `]
 })

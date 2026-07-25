@@ -18,12 +18,12 @@ import { ApiService } from '../../core/services/api.service';
     </div>
   `,
   styles: [`
-    .container { padding: 2rem; max-width: 800px; margin: 0 auto; background: #1a1a2e; color: white; min-height: 100vh; }
-    h1 { color: #e2b714; }
+    .container { padding: 2rem; max-width: 800px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
+    h1 { color: var(--accent); }
     .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 2rem; }
-    .stat-card { background: #16213e; padding: 2rem; border-radius: 12px; text-align: center; }
-    .stat-card h3 { font-size: 2.5rem; color: #e2b714; margin: 0; }
-    .stat-card p { color: #888; margin-top: 0.5rem; }
+    .stat-card { background: var(--surface); padding: 2rem; border-radius: 12px; text-align: center; }
+    .stat-card h3 { font-size: 2.5rem; color: var(--accent); margin: 0; }
+    .stat-card p { color: var(--text-secondary); margin-top: 0.5rem; }
   `]
 })
 export class DashboardComponent implements OnInit {

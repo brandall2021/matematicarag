@@ -18,9 +18,9 @@ import { MatButtonModule } from '@angular/material/button';
     </div>
   `,
   styles: [`
-    .container { padding: 2rem; max-width: 800px; margin: 0 auto; background: #1a1a2e; color: white; min-height: 100vh; }
-    h1 { color: #e2b714; }
-    .empty-state { text-align: center; margin-top: 3rem; padding: 3rem; background: #16213e; border-radius: 12px; }
+    .container { padding: 2rem; max-width: 800px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
+    h1 { color: var(--accent); }
+    .empty-state { text-align: center; margin-top: 3rem; padding: 3rem; background: var(--surface); border-radius: 12px; }
   `]
 })
 export class DocumentsComponent {}

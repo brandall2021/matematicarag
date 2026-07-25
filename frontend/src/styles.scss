@@ -1,6 +1,44 @@
+:root, [data-theme="dark"] {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --border: #2a2a4a;
+  --text: #ffffff;
+  --text-secondary: #888888;
+  --accent: #e2b714;
+  --input-bg: #16213e;
+}
+
+[data-theme="light"] {
+  --bg: #f5f5f5;
+  --surface: #ffffff;
+  --border: #e0e0e0;
+  --text: #1a1a2e;
+  --text-secondary: #666666;
+  --accent: #c9a000;
+  --input-bg: #ffffff;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', sans-serif;
-  background: #1a1a2e;
-  color: white;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
