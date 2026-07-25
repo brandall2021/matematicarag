@@ -2,12 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type MathRequest struct {
@@ -33,7 +35,7 @@ type PlotResponse struct {
 	LatexExpression string    `json:"latexExpression"`
 }
 
-func MathRoutes() func(r chi.Router) {
+func MathRoutes(db *pgxpool.Pool) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Post("/evaluate", func(w http.ResponseWriter, r *http.Request) {
 			var req MathRequest
@@ -41,7 +43,26 @@ func MathRoutes() func(r chi.Router) {
 				http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 				return
 			}
-			result := evaluateMath(req.Expression)
+			if req.Expression == "" {
+				http.Error(w, `{"error":"expression is required"}`, http.StatusBadRequest)
+				return
+			}
+
+			// Try local eval first for simple expressions
+			if result, ok := localEvaluate(req.Expression); ok {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(MathResponse{Success: true, Result: result})
+				return
+			}
+
+			// Fall back to OpenAI
+			prompt := fmt.Sprintf("Evalua esta expresion matematica y responde SOLO con el resultado numerico, sin explicacion: %s", req.Expression)
+			result, err := callOpenAI(db, "Sos una calculadora. Respondes SOLO con el resultado numerico.", prompt, "")
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(MathResponse{Success: false, Error: err.Error()})
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(MathResponse{Success: true, Result: result})
 		})
@@ -72,42 +93,68 @@ func MathRoutes() func(r chi.Router) {
 			})
 		})
 
-		r.Post("/derive", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "derive") })
-		r.Post("/integrate", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "integrate") })
-		r.Post("/solve", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "solve") })
-		r.Post("/simplify", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "simplify") })
-		r.Post("/factor", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "factor") })
-		r.Post("/expand", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "expand") })
-		r.Post("/limit", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "limit") })
-		r.Post("/sum", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "sum") })
-		r.Post("/product", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "product") })
-		r.Post("/roots", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "roots") })
-		r.Post("/matrix-determinant", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "matrix-determinant") })
-		r.Post("/matrix-inverse", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "matrix-inverse") })
-		r.Post("/matrix-rank", func(w http.ResponseWriter, r *http.Request) { handleMathOp(w, r, "matrix-rank") })
+		r.Post("/derive", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "derivar", "derivative") })
+		r.Post("/integrate", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "integrar", "integral") })
+		r.Post("/solve", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "resolver ecuacion", "solve equation") })
+		r.Post("/simplify", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "simplificar", "simplify") })
+		r.Post("/factor", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "factorizar", "factor") })
+		r.Post("/expand", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "expandir", "expand") })
+		r.Post("/limit", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "calcular limite", "limit") })
+		r.Post("/sum", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "calcular suma", "sum") })
+		r.Post("/product", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "calcular producto", "product") })
+		r.Post("/roots", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "encontrar raices", "find roots") })
+		r.Post("/matrix-determinant", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "determinante de matriz", "matrix determinant") })
+		r.Post("/matrix-inverse", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "inversa de matriz", "matrix inverse") })
+		r.Post("/matrix-rank", func(w http.ResponseWriter, r *http.Request) { handleMathOpAI(w, r, db, "rango de matriz", "matrix rank") })
 	}
 }
 
-func handleMathOp(w http.ResponseWriter, r *http.Request, operation string) {
+func handleMathOpAI(w http.ResponseWriter, r *http.Request, db *pgxpool.Pool, opName string, opEnglish string) {
 	var req MathRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 		return
 	}
+	if req.Expression == "" {
+		http.Error(w, `{"error":"expression is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	systemPrompt := fmt.Sprintf("Sos un experto en matematicas. %s expresiones matematicas. Respondes con el resultado paso a paso en español.", strings.Title(opName))
+	userPrompt := fmt.Sprintf("%s: %s", opName, req.Expression)
+
+	result, err := callOpenAI(db, systemPrompt, userPrompt, "")
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(MathResponse{Success: false, Error: err.Error()})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(MathResponse{Success: true, Result: operation + " placeholder"})
+	json.NewEncoder(w).Encode(MathResponse{Success: true, Result: result})
 }
 
-func evaluateMath(expr string) string {
+func localEvaluate(expr string) (string, bool) {
+	// Try simple power: a^b
 	if strings.Contains(expr, "^") {
 		parts := strings.Split(expr, "^")
 		if len(parts) == 2 {
 			base, err1 := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
 			exp, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
 			if err1 == nil && err2 == nil {
-				return strconv.FormatFloat(math.Pow(base, exp), 'f', -1, 64)
+				return strconv.FormatFloat(math.Pow(base, exp), 'f', -1, 64), true
 			}
 		}
 	}
-	return expr
+	// Try simple arithmetic
+	expr = strings.ReplaceAll(expr, " ", "")
+	if isNumeric(expr) {
+		return expr, true
+	}
+	return "", false
+}
+
+func isNumeric(s string) bool {
+	_, err := strconv.ParseFloat(s, 64)
+	return err == nil
 }

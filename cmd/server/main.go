@@ -46,7 +46,7 @@ func main() {
 		r.Route("/auth", api.AuthRoutes(db, cfg))
 		r.Route("/chat", api.ChatRoutes(db, cfg))
 		r.Route("/rag", api.RagRoutes(db, cfg))
-		r.Route("/math", api.MathRoutes())
+		r.Route("/math", api.MathRoutes(db))
 		r.Route("/documents", api.DocumentRoutes(db, cfg))
 		r.Route("/history", api.HistoryRoutes(db))
 		r.Route("/analytics", api.AnalyticsRoutes(db))

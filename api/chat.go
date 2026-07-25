@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
-	"fmt"
 
 	"github.com/brandall2021/matematicarag/internal/config"
 	"github.com/go-chi/chi/v5"
@@ -33,6 +32,12 @@ type ChatSession struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+const systemPrompt = `Sos MatematicaRAG, un tutor inteligente de matematicas de la Universidad Nacional de Tucuman (FACE). 
+Respondes en español, de forma clara y didactica. Explicas conceptos matematicos con ejemplos.
+Si te hacen una pregunta de matematicas, resuelvela paso a paso.
+Si te saludan, responde de forma amigable.
+Sos experto en: algebra, calculo, geometria, estadistica, probabilidad, lineal algebra, ecuaciones diferenciales.`
+
 func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Use(AuthMiddleware(cfg.JWTSecret))
@@ -59,32 +64,92 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				}
 				req.SessionID = sessionID
 			}
-			var msgID string
-			err := db.QueryRow(r.Context(),
+
+			_, err := db.QueryRow(r.Context(),
 				`INSERT INTO chat_messages (session_id, role, content, model) VALUES ($1, 'USER', $2, $3) RETURNING id`,
 				req.SessionID, req.Content, req.Model,
-			).Scan(&msgID)
+			).Result()
 			if err != nil {
 				http.Error(w, `{"error":"failed to save message"}`, http.StatusInternalServerError)
 				return
 			}
-			_ = msgID
-			response := fmt.Sprintf("Echo: %s", req.Content)
-			sources := json.RawMessage(`[]`)
+
+			// Get history for context
+			historyRows, _ := db.Query(r.Context(),
+				`SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC`, req.SessionID)
+			var history []OpenAIMessage
+			if historyRows != nil {
+				defer historyRows.Close()
+				for historyRows.Next() {
+					var m OpenAIMessage
+					if historyRows.Scan(&m.Role, &m.Content) == nil {
+						history = append(history, m)
+					}
+				}
+			}
+
+			// Build messages with history
+			messages := []OpenAIMessage{{Role: "system", Content: systemPrompt}}
+			messages = append(messages, history...)
+
+			// Call OpenAI
+			apiKey := getAPIKey(db)
+			if apiKey == "" {
+				http.Error(w, `{"error":"API key no configurada. Agrega OPENAI_API_KEY en Configuracion > API Keys"}`, http.StatusServiceUnavailable)
+				return
+			}
+
+			model := req.Model
+			if model == "" {
+				model = "gpt-3.5-turbo"
+			}
+
+			reqBody := OpenAIRequest{
+				Model:     model,
+				Messages:  messages,
+				MaxTokens: 1024,
+			}
+			body, _ := json.Marshal(reqBody)
+			httpReq, _ := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
+			httpReq.Header.Set("Content-Type", "application/json")
+			httpReq.Header.Set("Authorization", "Bearer "+apiKey)
+
+			resp, err := http.DefaultClient.Do(httpReq)
+			if err != nil {
+				http.Error(w, `{"error":"error al conectar con OpenAI: `+err.Error()+`"}`, http.StatusBadGateway)
+				return
+			}
+			defer resp.Body.Close()
+
+			var openAIResp OpenAIResponse
+			json.NewDecoder(resp.Body).Decode(&openAIResp)
+
+			if openAIResp.Error != nil {
+				http.Error(w, `{"error":"OpenAI: `+openAIResp.Error.Message+`"}`, http.StatusBadGateway)
+				return
+			}
+			if len(openAIResp.Choices) == 0 {
+				http.Error(w, `{"error":"sin respuesta de OpenAI"}`, http.StatusBadGateway)
+				return
+			}
+
+			response := strings.TrimSpace(openAIResp.Choices[0].Message.Content)
+
 			var assistantID string
 			err = db.QueryRow(r.Context(),
-				`INSERT INTO chat_messages (session_id, role, content, model, sources) VALUES ($1, 'ASSISTANT', $2, $3, $4) RETURNING id`,
-				req.SessionID, response, req.Model, sources,
+				`INSERT INTO chat_messages (session_id, role, content, model) VALUES ($1, 'ASSISTANT', $2, $3) RETURNING id`,
+				req.SessionID, response, model,
 			).Scan(&assistantID)
 			if err != nil {
 				http.Error(w, `{"error":"failed to save response"}`, http.StatusInternalServerError)
 				return
 			}
 			_, _ = db.Exec(r.Context(), `UPDATE chat_sessions SET updated_at = NOW() WHERE id = $1`, req.SessionID)
+
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(ChatMessage{
 				ID: assistantID, Role: "ASSISTANT", Content: response,
-				Model: req.Model, Sources: sources, CreatedAt: time.Now(),
+				Model: model, CreatedAt: time.Now(),
 			})
 		})
 
