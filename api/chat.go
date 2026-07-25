@@ -95,6 +95,7 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			messages := []OpenAIMessage{{Role: "system", Content: customPrompt}}
 			messages = append(messages, history...)
+			messages = append(messages, OpenAIMessage{Role: "user", Content: req.Content})
 
 			// Call AI
 			model := getModel(db, req.Model)
@@ -104,23 +105,7 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				return
 			}
 
-			provider := getProvider(db)
-			var response string
-			var callErr error
-
-			if provider == "anthropic" {
-				historyText := ""
-				for _, m := range history {
-					if m.Role == "user" {
-						historyText += m.Content + "\n"
-					} else {
-						historyText += "Asistente: " + m.Content + "\n"
-					}
-				}
-				response, callErr = callAnthropic(apiKey, model, customPrompt, historyText+req.Content)
-			} else {
-				response, callErr = callOpenAICompatible(provider, apiKey, model, customPrompt, req.Content)
-			}
+			response, callErr := callOpenAIWithHistory(db, messages, model)
 
 			if callErr != nil {
 				http.Error(w, `{"error":"`+callErr.Error()+`"}`, http.StatusBadGateway)

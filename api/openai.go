@@ -24,7 +24,9 @@ type OpenAIRequest struct {
 }
 
 type OpenAIChoice struct {
-	Content string `json:"content"`
+	Message struct {
+		Content string `json:"content"`
+	} `json:"message"`
 }
 
 type OpenAIResponse struct {
@@ -93,6 +95,13 @@ func getModel(db *pgxpool.Pool, override string) string {
 }
 
 func callOpenAI(db *pgxpool.Pool, systemPrompt string, userMessage string, model string) (string, error) {
+	return callOpenAIWithHistory(db, []OpenAIMessage{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: userMessage},
+	}, model)
+}
+
+func callOpenAIWithHistory(db *pgxpool.Pool, messages []OpenAIMessage, model string) (string, error) {
 	provider := getProvider(db)
 	model = getModel(db, model)
 	apiKey := getAPIKey(db)
@@ -102,13 +111,20 @@ func callOpenAI(db *pgxpool.Pool, systemPrompt string, userMessage string, model
 	}
 
 	if provider == "anthropic" {
-		return callAnthropic(apiKey, model, systemPrompt, userMessage)
+		return callAnthropicWithMessages(apiKey, model, messages)
 	}
 
-	return callOpenAICompatible(provider, apiKey, model, systemPrompt, userMessage)
+	return callOpenAICompatibleWithMessages(provider, apiKey, model, messages)
 }
 
 func callOpenAICompatible(provider, apiKey, model, systemPrompt, userMessage string) (string, error) {
+	return callOpenAICompatibleWithMessages(provider, apiKey, model, []OpenAIMessage{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: userMessage},
+	})
+}
+
+func callOpenAICompatibleWithMessages(provider, apiKey, model string, messages []OpenAIMessage) (string, error) {
 	var baseURL string
 	switch provider {
 	case "groq":
@@ -120,11 +136,8 @@ func callOpenAICompatible(provider, apiKey, model, systemPrompt, userMessage str
 	}
 
 	reqBody := OpenAIRequest{
-		Model: model,
-		Messages: []OpenAIMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: userMessage},
-		},
+		Model:     model,
+		Messages:  messages,
 		MaxTokens: 1024,
 	}
 
@@ -164,17 +177,35 @@ func callOpenAICompatible(provider, apiKey, model, systemPrompt, userMessage str
 		return "", fmt.Errorf("no response from %s", provider)
 	}
 
-	return strings.TrimSpace(openAIResp.Choices[0].Content), nil
+	return strings.TrimSpace(openAIResp.Choices[0].Message.Content), nil
 }
 
 func callAnthropic(apiKey, model, systemPrompt, userMessage string) (string, error) {
+	return callAnthropicWithMessages(apiKey, model, []OpenAIMessage{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: userMessage},
+	})
+}
+
+func callAnthropicWithMessages(apiKey, model string, messages []OpenAIMessage) (string, error) {
+	var systemMsg string
+	var anthropicMessages []AnthropicMessage
+	for _, m := range messages {
+		if m.Role == "system" {
+			systemMsg = m.Content
+		} else {
+			anthropicMessages = append(anthropicMessages, AnthropicMessage{Role: m.Role, Content: m.Content})
+		}
+	}
+	if len(anthropicMessages) == 0 {
+		anthropicMessages = []AnthropicMessage{{Role: "user", Content: "hello"}}
+	}
+
 	reqBody := AnthropicRequest{
 		Model:     model,
 		MaxTokens: 1024,
-		System:    systemPrompt,
-		Messages: []AnthropicMessage{
-			{Role: "user", Content: userMessage},
-		},
+		System:    systemMsg,
+		Messages:  anthropicMessages,
 	}
 
 	body, err := json.Marshal(reqBody)
