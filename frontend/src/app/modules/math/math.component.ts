@@ -15,14 +15,6 @@ import 'mathlive';
   template: `
     <div class="math-container">
       <h1>Motor Matematico</h1>
-      <div class="operations">
-        <button mat-raised-button (click)="op.set('evaluate')" [class.active]="op() === 'evaluate'">Evaluar</button>
-        <button mat-raised-button (click)="op.set('derive')" [class.active]="op() === 'derive'">Derivar</button>
-        <button mat-raised-button (click)="op.set('integrate')" [class.active]="op() === 'integrate'">Integrar</button>
-        <button mat-raised-button (click)="op.set('solve')" [class.active]="op() === 'solve'">Resolver</button>
-        <button mat-raised-button (click)="op.set('simplify')" [class.active]="op() === 'simplify'">Simplificar</button>
-        <button mat-raised-button (click)="op.set('factor')" [class.active]="op() === 'factor'">Factorizar</button>
-      </div>
 
       <div class="mathfield-wrapper">
         <math-field
@@ -42,8 +34,9 @@ import 'mathlive';
           <span class="latex-label">LaTeX:</span>
           <code>{{ latexValue() }}</code>
         </div>
-        <button mat-raised-button color="primary" (click)="calculate()" [disabled]="!latexValue()">
-          <mat-icon>play_arrow</mat-icon> Calcular
+        <button mat-raised-button color="primary" (click)="calculate()" [disabled]="!latexValue() || loading()">
+          <mat-icon>{{ loading() ? 'sync' : 'play_arrow' }}</mat-icon>
+          {{ loading() ? 'Calculando...' : 'Calcular' }}
         </button>
       </div>
 
@@ -58,9 +51,6 @@ import 'mathlive';
   styles: [`
     .math-container { padding: 2rem; max-width: 900px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
     h1 { color: var(--accent); font-family: 'Newsreader', serif; margin-bottom: 1.5rem; }
-    .operations { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-    .operations button { font-size: 0.85rem; }
-    .operations button.active { background: var(--accent); color: var(--bg); }
     .mathfield-wrapper { background: var(--surface); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 2px solid var(--border); }
     .mathfield-wrapper:focus-within { border-color: var(--accent); }
     .mathfield-element { width: 100%; font-size: 1.4rem; min-height: 60px; }
@@ -86,10 +76,9 @@ import 'mathlive';
 export class MathComponent implements AfterViewInit, OnDestroy {
   @ViewChild('mathField') mathFieldRef!: ElementRef<any>;
 
-  expression = '';
-  op = signal('evaluate');
   result = signal('');
   latexValue = signal('');
+  loading = signal(false);
 
   private mf: any = null;
 
@@ -127,12 +116,16 @@ export class MathComponent implements AfterViewInit, OnDestroy {
     const expr = this.latexValue();
     if (!expr) return;
 
-    const endpoint = this.op();
-    this.api.mathOperation(endpoint, expr).subscribe({
+    this.loading.set(true);
+    this.result.set('');
+
+    this.api.mathEvaluate(expr).subscribe({
       next: (res: any) => {
+        this.loading.set(false);
         this.result.set(res.result || res.error || 'Sin resultado');
       },
       error: (err: any) => {
+        this.loading.set(false);
         this.result.set(err.error?.error || 'Error al calcular');
       }
     });

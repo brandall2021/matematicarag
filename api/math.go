@@ -56,8 +56,11 @@ func MathRoutes(db *pgxpool.Pool) func(r chi.Router) {
 			}
 
 			// Fall back to OpenAI
-			prompt := fmt.Sprintf("Evalua esta expresion matematica y responde SOLO con el resultado numerico, sin explicacion: %s", req.Expression)
-			result, err := callOpenAI(db, "Sos una calculadora. Respondes SOLO con el resultado numerico.", prompt, "")
+			customMathPrompt := getSetting(db, "MATH_SYSTEM_PROMPT")
+			if customMathPrompt == "" {
+				customMathPrompt = `Sos un experto en matematicas. Analizas la expresion o instruccion del usuario y realizas la operacion correspondiente: evaluar, derivar, integrar, resolver ecuaciones, simplificar, factorizar, calcular limites, sumas, productos, raices, determinantes, etc. Respondes con el resultado paso a paso en español. Si la expresion es solo un numero,respondes con ese numero.`
+			}
+			result, err := callOpenAI(db, customMathPrompt, req.Expression, "")
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(MathResponse{Success: false, Error: err.Error()})
