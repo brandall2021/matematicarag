@@ -101,18 +101,6 @@ func Migrate(db *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_usage_logs_user ON usage_logs(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_usage_logs_created ON usage_logs(created_at)`,
-		`CREATE EXTENSION IF NOT EXISTS vector`,
-		`CREATE TABLE IF NOT EXISTS document_chunks (
-			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-			chunk_index INTEGER NOT NULL,
-			content TEXT NOT NULL,
-			embedding vector(1536),
-			metadata JSONB,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_chunks_document ON document_chunks(document_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON document_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10)`,
 	}
 
 	for _, m := range migrations {

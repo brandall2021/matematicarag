@@ -18,7 +18,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/ledongthuc/pdf"
-	pgvector "github.com/pgvector/pgvector-go"
 )
 
 type Document struct {
@@ -33,21 +32,19 @@ type Document struct {
 }
 
 type DocumentChunk struct {
-	ID         string          `json:"id"`
-	DocID      string          `json:"documentId"`
-	ChunkIndex int             `json:"chunkIndex"`
-	Content    string          `json:"content"`
-	Embedding  []float32       `json:"-"`
-	Metadata   json.RawMessage `json:"metadata,omitempty"`
-	CreatedAt  string          `json:"createdAt"`
+	ID         string `json:"id"`
+	DocID      string `json:"documentId"`
+	ChunkIndex int    `json:"chunkIndex"`
+	Content    string `json:"content"`
+	Filename   string `json:"filename,omitempty"`
 }
 
 type VectorSearchResult struct {
-	ChunkID   string  `json:"chunkId"`
-	DocID     string  `json:"documentId"`
-	Content   string  `json:"content"`
-	Score     float64 `json:"score"`
-	Filename  string  `json:"filename"`
+	ChunkID  string  `json:"chunkId"`
+	DocID    string  `json:"documentId"`
+	Content  string  `json:"content"`
+	Score    float64 `json:"score"`
+	Filename string  `json:"filename"`
 }
 
 var uploadDir = "./uploads"
@@ -62,7 +59,7 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 
 		r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
 			userID := r.Context().Value(UserIDKey).(string)
-			r.ParseMultipartForm(50 << 20) // 50MB max
+			r.ParseMultipartForm(50 << 20)
 
 			file, handler, err := r.FormFile("file")
 			if err != nil {
@@ -73,23 +70,21 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 
 			ext := strings.ToLower(filepath.Ext(handler.Filename))
 			if ext != ".pdf" && ext != ".txt" && ext != ".md" && ext != ".docx" && ext != ".doc" {
-				http.Error(w, `{"error":"unsupported file type. Allowed: pdf, docx, txt, md"}`, http.StatusBadRequest)
+				http.Error(w, `{"error":"tipo no soportado. Permitidos: pdf, docx, txt, md"}`, http.StatusBadRequest)
 				return
 			}
 
-			// Save file
 			filename := fmt.Sprintf("%d%s", time.Now().UnixNano(), ext)
 			savePath := filepath.Join(uploadDir, filename)
 			dst, err := os.Create(savePath)
 			if err != nil {
-				http.Error(w, `{"error":"failed to save file"}`, http.StatusInternalServerError)
+				http.Error(w, `{"error":"error al guardar archivo"}`, http.StatusInternalServerError)
 				return
 			}
 			content, _ := io.ReadAll(file)
 			dst.Write(content)
 			dst.Close()
 
-			// Insert document record
 			var docID string
 			err = db.QueryRow(r.Context(),
 				`INSERT INTO documents (filename, original_name, type, size, status, uploaded_by)
@@ -97,12 +92,11 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				filename, handler.Filename, ext, handler.Size, userID,
 			).Scan(&docID)
 			if err != nil {
-				http.Error(w, `{"error":"failed to save document"}`, http.StatusInternalServerError)
+				http.Error(w, `{"error":"error al guardar registro"}`, http.StatusInternalServerError)
 				return
 			}
 
-			// Process in background: extract text, chunk, embed
-			go processDocument(db, docID, savePath, ext)
+			go processDocument(db, docID, savePath, ext, handler.Filename)
 
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(Document{
@@ -114,11 +108,8 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			userID := r.Context().Value(UserIDKey).(string)
 			rows, err := db.Query(r.Context(),
-				`SELECT d.id, d.filename, d.original_name, d.type, d.size, d.status,
-				        COUNT(c.id)::int, d.created_at
-				 FROM documents d LEFT JOIN document_chunks c ON c.document_id = d.id
-				 WHERE d.uploaded_by = $1
-				 GROUP BY d.id ORDER BY d.created_at DESC`, userID,
+				`SELECT id, filename, original_name, type, size, status, created_at
+				 FROM documents WHERE uploaded_by = $1 ORDER BY created_at DESC`, userID,
 			)
 			if err != nil {
 				http.Error(w, `{"error":"failed to list documents"}`, http.StatusInternalServerError)
@@ -128,7 +119,11 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			docs := make([]Document, 0)
 			for rows.Next() {
 				var d Document
-				if err := rows.Scan(&d.ID, &d.Filename, &d.OriginalName, &d.Type, &d.Size, &d.Status, &d.ChunkCount, &d.CreatedAt); err == nil {
+				if err := rows.Scan(&d.ID, &d.Filename, &d.OriginalName, &d.Type, &d.Size, &d.Status, &d.CreatedAt); err == nil {
+					if d.Status == "indexed" {
+						count, _ := qdrantCountByDocID(d.ID)
+						d.ChunkCount = count
+					}
 					docs = append(docs, d)
 				}
 			}
@@ -138,22 +133,26 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 
 		r.Get("/{id}/chunks", func(w http.ResponseWriter, r *http.Request) {
 			docID := chi.URLParam(r, "id")
-			rows, err := db.Query(r.Context(),
-				`SELECT id, document_id, chunk_index, content, COALESCE(metadata, '{}'), created_at
-				 FROM document_chunks WHERE document_id = $1 ORDER BY chunk_index`, docID,
-			)
+
+			// Search Qdrant for all chunks of this document
+			// Use a zero vector with filter to get all chunks
+			results, err := qdrantSearchByDocID(docID, 100)
 			if err != nil {
 				http.Error(w, `{"error":"failed to get chunks"}`, http.StatusInternalServerError)
 				return
 			}
-			defer rows.Close()
-			chunks := make([]DocumentChunk, 0)
-			for rows.Next() {
-				var c DocumentChunk
-				if err := rows.Scan(&c.ID, &c.DocID, &c.ChunkIndex, &c.Content, &c.Metadata, &c.CreatedAt); err == nil {
-					chunks = append(chunks, c)
+
+			chunks := make([]DocumentChunk, len(results))
+			for i, res := range results {
+				chunks[i] = DocumentChunk{
+					ID:         res.ID,
+					DocID:      fmt.Sprintf("%v", res.Payload["document_id"]),
+					ChunkIndex: int(res.Payload["chunk_index"].(float64)),
+					Content:    res.Payload["content"].(string),
+					Filename:   fmt.Sprintf("%v", res.Payload["filename"]),
 				}
 			}
+
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(chunks)
 		})
@@ -166,6 +165,7 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 				return
 			}
+			qdrantDeleteByDocID(docID)
 			db.Exec(r.Context(), `DELETE FROM documents WHERE id = $1`, docID)
 			os.Remove(filepath.Join(uploadDir, filename))
 			w.WriteHeader(http.StatusNoContent)
@@ -173,7 +173,7 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	}
 }
 
-func processDocument(db *pgxpool.Pool, docID, filePath, ext string) {
+func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string) {
 	ctx := context.Background()
 	text, err := extractText(filePath, ext)
 	if err != nil {
@@ -187,6 +187,12 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext string) {
 		return
 	}
 
+	// Ensure Qdrant collection exists
+	if err := ensureQdrantCollection(); err != nil {
+		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
+		return
+	}
+
 	embeddings, err := generateEmbeddings(db, chunks)
 	if err != nil {
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
@@ -194,11 +200,8 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext string) {
 	}
 
 	for i, chunk := range chunks {
-		emb := pgvector.NewVector(embeddings[i])
-		db.Exec(ctx,
-			`INSERT INTO document_chunks (document_id, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)`,
-			docID, i, chunk, emb,
-		)
+		chunkID := fmt.Sprintf("%s_%d", docID, i)
+		qdrantUpsert(docID, i, chunkID, embeddings[i], chunk, originalName)
 	}
 
 	db.Exec(ctx, `UPDATE documents SET status = 'indexed' WHERE id = $1`, docID)
@@ -236,13 +239,13 @@ func extractPDFText(filePath string) (string, error) {
 }
 
 func extractDOCXText(filePath string) (string, error) {
-	r, err := zip.OpenReader(filePath)
+	archive, err := zip.OpenReader(filePath)
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
+	defer archive.Close()
 
-	for _, f := range r.File {
+	for _, f := range archive.File {
 		if f.Name == "word/document.xml" {
 			rc, err := f.Open()
 			if err != nil {
@@ -250,12 +253,10 @@ func extractDOCXText(filePath string) (string, error) {
 			}
 			defer rc.Close()
 			data, _ := io.ReadAll(rc)
-			// Simple XML tag stripping
 			text := string(data)
 			text = strings.ReplaceAll(text, "</w:p>", "\n")
 			text = strings.ReplaceAll(text, "</w:r>", "")
 			text = strings.ReplaceAll(text, "</w:t>", "")
-			// Strip all XML tags
 			for {
 				start := strings.Index(text, "<")
 				if start == -1 {
@@ -287,8 +288,7 @@ func chunkText(text string, chunkSize, overlap int) []string {
 		if end > len(runes) {
 			end = len(runes)
 		}
-		chunk := string(runes[i:end])
-		chunk = strings.TrimSpace(chunk)
+		chunk := strings.TrimSpace(string(runes[i:end]))
 		if len(chunk) > 20 {
 			chunks = append(chunks, chunk)
 		}
@@ -344,13 +344,6 @@ func generateEmbeddings(db *pgxpool.Pool, texts []string) ([][]float32, error) {
 	return embeddings, nil
 }
 
-func getOpenAIKey() string {
-	if v := os.Getenv("OPENAI_API_KEY"); v != "" {
-		return v
-	}
-	return ""
-}
-
 func getEmbeddingAPIKey(db *pgxpool.Pool) string {
 	keyName := getSetting(db, "AI_API_KEY_NAME")
 	if keyName == "" {
@@ -359,7 +352,7 @@ func getEmbeddingAPIKey(db *pgxpool.Pool) string {
 	if v := getSetting(db, keyName); v != "" {
 		return v
 	}
-	return getOpenAIKey()
+	return ""
 }
 
 func VectorSearch(db *pgxpool.Pool, query string, topK int) ([]VectorSearchResult, error) {
@@ -368,7 +361,6 @@ func VectorSearch(db *pgxpool.Pool, query string, topK int) ([]VectorSearchResul
 		return nil, fmt.Errorf("no API key for embeddings")
 	}
 
-	// Embed the query
 	queryEmb, err := generateEmbeddings(db, []string{query})
 	if err != nil {
 		return nil, err
@@ -377,40 +369,22 @@ func VectorSearch(db *pgxpool.Pool, query string, topK int) ([]VectorSearchResul
 		return nil, fmt.Errorf("no embedding generated")
 	}
 
-	emb := pgvector.NewVector(queryEmb[0])
-	vec := fmt.Sprintf("[%s]", floatsToString(queryEmb[0]))
-
-	rows, err := db.Query(context.Background(),
-		`SELECT c.id, c.document_id, c.content,
-		        1 - (c.embedding <=> $1::vector) AS score,
-		        d.original_name
-		 FROM document_chunks c
-		 JOIN documents d ON d.id = c.document_id
-		 ORDER BY c.embedding <=> $1::vector
-		 LIMIT $2`, vec, topK,
-	)
+	results, err := qdrantSearch(queryEmb[0], topK)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	_ = emb // used for type checking
-	results := make([]VectorSearchResult, 0)
-	for rows.Next() {
-		var r VectorSearchResult
-		if err := rows.Scan(&r.ChunkID, &r.DocID, &r.Content, &r.Score, &r.Filename); err == nil {
-			results = append(results, r)
+	searchResults := make([]VectorSearchResult, len(results))
+	for i, r := range results {
+		searchResults[i] = VectorSearchResult{
+			ChunkID:  r.ID,
+			DocID:    fmt.Sprintf("%v", r.Payload["document_id"]),
+			Content:  r.Payload["content"].(string),
+			Score:    r.Score,
+			Filename: fmt.Sprintf("%v", r.Payload["filename"]),
 		}
 	}
-	return results, nil
-}
-
-func floatsToString(fs []float32) string {
-	parts := make([]string, len(fs))
-	for i, f := range fs {
-		parts[i] = fmt.Sprintf("%f", f)
-	}
-	return strings.Join(parts, ",")
+	return searchResults, nil
 }
 
 func cosineSimilarity(a, b []float32) float64 {
