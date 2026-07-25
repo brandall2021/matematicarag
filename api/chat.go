@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/brandall2021/matematicarag/internal/config"
@@ -83,6 +84,7 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				for historyRows.Next() {
 					var m OpenAIMessage
 					if historyRows.Scan(&m.Role, &m.Content) == nil {
+						m.Role = strings.ToLower(m.Role)
 						history = append(history, m)
 					}
 				}
