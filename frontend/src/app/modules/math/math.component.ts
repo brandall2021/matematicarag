@@ -5,7 +5,9 @@ import { ApiService } from '../../core/services/api.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
-import 'mathlive';
+import { MathfieldElement } from 'mathlive';
+
+MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0/fonts';
 
 @Component({
   selector: 'app-math',
