@@ -48,12 +48,12 @@ func main() {
 		r.Route("/rag", api.RagRoutes(db, cfg))
 		r.Route("/math", api.MathRoutes(db))
 		r.Route("/documents", api.DocumentRoutes(db, cfg))
-		r.Route("/history", api.HistoryRoutes(db))
 		r.Route("/analytics", api.AnalyticsRoutes(db))
 		r.Route("/indexer", api.IndexerRoutes(db, cfg))
 
 		r.Group(func(r chi.Router) {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
+			r.Route("/history", api.HistoryRoutes(db))
 			r.Route("/users", api.UserRoutes(db))
 		})
 
