@@ -82,6 +82,12 @@ func SettingsRoutes(db *pgxpool.Pool) func(r chi.Router) {
 		})
 
 		r.Post("/verify-openai", func(w http.ResponseWriter, r *http.Request) {
+			var req struct {
+				Provider string `json:"provider"`
+				Model    string `json:"model"`
+			}
+			json.NewDecoder(r.Body).Decode(&req)
+
 			apiKey := getAPIKey(db)
 			if apiKey == "" {
 				w.Header().Set("Content-Type", "application/json")
@@ -91,18 +97,34 @@ func SettingsRoutes(db *pgxpool.Pool) func(r chi.Router) {
 				return
 			}
 
-			result, err := callOpenAI(db, "Sos un asistente. Respondes SOLO con 'OK'.", "Responde OK", "")
-			if err != nil {
+			model := req.Model
+			if model == "" {
+				model = getModel(db, "")
+			}
+			provider := req.Provider
+			if provider == "" {
+				provider = getProvider(db)
+			}
+
+			var result string
+			var callErr error
+			if provider == "anthropic" {
+				result, callErr = callAnthropic(apiKey, model, "Sos un asistente. Respondes SOLO con 'OK'.", "Responde OK")
+			} else {
+				result, callErr = callOpenAICompatible(provider, apiKey, model, "Sos un asistente. Respondes SOLO con 'OK'.", "Responde OK")
+			}
+
+			if callErr != nil {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]interface{}{
-					"ok": false, "error": err.Error(),
+					"ok": false, "error": callErr.Error(),
 				})
 				return
 			}
 
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
-				"ok": true, "model": "gpt-3.5-turbo", "response": result,
+				"ok": true, "model": model, "model_used": model, "provider": provider, "response": result,
 			})
 		})
 	}

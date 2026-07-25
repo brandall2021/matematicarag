@@ -91,7 +91,7 @@ func getModel(db *pgxpool.Pool, override string) string {
 	if m != "" {
 		return m
 	}
-	return "gpt-3.5-turbo"
+	return "gpt-4.1"
 }
 
 func callOpenAI(db *pgxpool.Pool, systemPrompt string, userMessage string, model string) (string, error) {

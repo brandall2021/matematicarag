@@ -147,13 +147,21 @@ interface Setting {
               </button>
             </div>
 
-            <h3>Prompt del Sistema</h3>
+            <h3>Prompts del Sistema</h3>
             <div class="prompt-card">
-              <label>Prompt general (chat + matematica)</label>
-              <textarea [(ngModel)]="systemPrompt" placeholder="Sos un tutor de matematicas de la UNT..." rows="5" class="form-textarea"></textarea>
-              <small class="model-hint">Se usa tanto para el chat como para las operaciones matematicas.</small>
-              <button mat-raised-button color="primary" (click)="savePrompt('SYSTEM_PROMPT', systemPrompt)" style="margin-top: 0.5rem">
-                <mat-icon>save</mat-icon> Guardar prompt
+              <label>Prompt del Chat</label>
+              <textarea [(ngModel)]="chatSystemPrompt" placeholder="Sos un tutor de matematicas de la UNT..." rows="5" class="form-textarea"></textarea>
+              <small class="model-hint">Se usa para las conversaciones de chat.</small>
+              <button mat-raised-button color="primary" (click)="savePrompt('CHAT_SYSTEM_PROMPT', chatSystemPrompt)" style="margin-top: 0.5rem">
+                <mat-icon>save</mat-icon> Guardar prompt chat
+              </button>
+            </div>
+            <div class="prompt-card">
+              <label>Prompt de Matematica</label>
+              <textarea [(ngModel)]="mathSystemPrompt" placeholder="Sos un experto en matematicas..." rows="5" class="form-textarea"></textarea>
+              <small class="model-hint">Se usa para las operaciones matematicas (evaluar, derivar, integrar, etc).</small>
+              <button mat-raised-button color="primary" (click)="savePrompt('MATH_SYSTEM_PROMPT', mathSystemPrompt)" style="margin-top: 0.5rem">
+                <mat-icon>save</mat-icon> Guardar prompt matematica
               </button>
             </div>
           </div>
@@ -248,30 +256,31 @@ export class SettingsComponent implements OnInit {
   newUser = { name: '', lastName: '', email: '', password: '', role: 'STUDENT' };
   newKey = { key: '', value: '', description: '' };
   showValue: Record<string, boolean> = {};
-  systemPrompt = '';
+  chatSystemPrompt = '';
+  mathSystemPrompt = '';
   verifying = signal(false);
   verifyResult = signal('');
   verifyOk = signal(false);
 
   aiProvider = 'openai';
-  aiModel = 'gpt-3.5-turbo';
+  aiModel = 'gpt-4.1';
 
   private modelsByProvider: Record<string, { models: string[], hint: string }> = {
     openai: {
-      models: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'gpt-4o-mini', 'o1-mini', 'o1-preview'],
-      hint: 'OpenAI - Modelos GPT. gpt-4o-mini es rapido y economico.'
+      models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini', 'gpt-3.5-turbo'],
+      hint: 'OpenAI - gpt-4.1 es el modelo mas capaz. gpt-4o-mini es rapido y economico.'
     },
     anthropic: {
-      models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'],
-      hint: 'Anthropic Claude - Excelente razonamiento matematico.'
+      models: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
+      hint: 'Anthropic Claude - claude-opus-4-7 es el mas capaz. claude-haiku-4-5 es rapido.'
     },
     groq: {
-      models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
-      hint: 'Groq - Ultra rapido, modelos open source.'
+      models: ['llama-4-scout-17b-16e-instruct', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+      hint: 'Groq - Ultra rapido. llama-4-scout es el mas nuevo.'
     },
     openrouter: {
-      models: ['openai/gpt-4o', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.1-70b-instruct', 'google/gemini-pro-1.5'],
-      hint: 'OpenRouter - Acceso a multiples proveedores.'
+      models: ['openai/gpt-4.1', 'anthropic/claude-opus-4-7', 'anthropic/claude-sonnet-4-6', 'meta-llama/llama-4-scout-17b-16e-instruct', 'google/gemini-2.5-pro', 'deepseek/deepseek-r1'],
+      hint: 'OpenRouter - Acceso a multiples proveedores con una sola key.'
     }
   };
 
@@ -317,13 +326,26 @@ export class SettingsComponent implements OnInit {
     this.http.get<Setting[]>(`${environment.apiUrl}/api/settings`).subscribe({
       next: (s) => {
         this.settings.set(s);
-        const prompt = s.find(x => x.key === 'SYSTEM_PROMPT');
-        if (prompt) this.systemPrompt = prompt.value;
+        const chatPrompt = s.find(x => x.key === 'CHAT_SYSTEM_PROMPT');
+        const mathPrompt = s.find(x => x.key === 'MATH_SYSTEM_PROMPT');
+        const legacyPrompt = s.find(x => x.key === 'SYSTEM_PROMPT');
+        if (chatPrompt) this.chatSystemPrompt = chatPrompt.value;
+        if (mathPrompt) this.mathSystemPrompt = mathPrompt.value;
+        if (!chatPrompt && !mathPrompt && legacyPrompt) {
+          this.chatSystemPrompt = legacyPrompt.value;
+          this.mathSystemPrompt = legacyPrompt.value;
+        }
         const prov = s.find(x => x.key === 'AI_PROVIDER');
         const model = s.find(x => x.key === 'AI_MODEL');
         if (prov) this.aiProvider = prov.value;
         if (model) this.aiModel = model.value;
         if (prov) this.onProviderChange();
+        if (model) {
+          const p = this.modelsByProvider[this.aiProvider];
+          if (p && p.models.includes(model.value)) {
+            this.aiModel = model.value;
+          }
+        }
       },
       error: () => this.showMessage('Error al cargar configuraciones', 'error')
     });
@@ -332,11 +354,14 @@ export class SettingsComponent implements OnInit {
   verifyOpenAI() {
     this.verifying.set(true);
     this.verifyResult.set('');
-    this.http.post<any>(`${environment.apiUrl}/api/settings/verify-openai`, {}).subscribe({
+    this.http.post<any>(`${environment.apiUrl}/api/settings/verify-openai`, {
+      provider: this.aiProvider,
+      model: this.aiModel
+    }).subscribe({
       next: (res) => {
         this.verifying.set(false);
         this.verifyOk.set(res.ok);
-        this.verifyResult.set(res.ok ? `Modelo: ${res.model}` : res.error);
+        this.verifyResult.set(res.ok ? `Modelo: ${res.model_used || res.model}` : res.error);
       },
       error: (err) => {
         this.verifying.set(false);
