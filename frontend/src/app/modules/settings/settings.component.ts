@@ -122,6 +122,31 @@ interface Setting {
           }
 
           <div class="prompts-section">
+            <h3>Configuracion de IA</h3>
+            <div class="prompt-card">
+              <label>Proveedor de IA</label>
+              <select [(ngModel)]="aiProvider" (ngModelChange)="onProviderChange()" class="form-select">
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic (Claude)</option>
+                <option value="groq">Groq</option>
+                <option value="openrouter">OpenRouter</option>
+              </select>
+            </div>
+            <div class="prompt-card">
+              <label>Modelo</label>
+              <select [(ngModel)]="aiModel" class="form-select">
+                @for (m of availableModels(); track m) {
+                  <option [value]="m">{{ m }}</option>
+                }
+              </select>
+              <small class="model-hint">{{ modelHint() }}</small>
+            </div>
+            <div class="prompt-card">
+              <button mat-raised-button color="primary" (click)="saveAIConfig()">
+                <mat-icon>save</mat-icon> Guardar configuracion IA
+              </button>
+            </div>
+
             <h3>Prompts personalizados</h3>
             <div class="prompt-card">
               <label>Prompt del Chat (tutor de matematicas)</label>
@@ -211,6 +236,7 @@ interface Setting {
     .prompt-card label { display: block; font-weight: 600; color: var(--text); font-size: 0.9rem; margin-bottom: 0.5rem; }
     .form-textarea { width: 100%; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 0.9rem; outline: none; font-family: inherit; resize: vertical; }
     .form-textarea:focus { border-color: var(--accent); }
+    .model-hint { display: block; color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem; }
   `]
 })
 export class SettingsComponent implements OnInit {
@@ -230,10 +256,57 @@ export class SettingsComponent implements OnInit {
   verifyResult = signal('');
   verifyOk = signal(false);
 
+  aiProvider = 'openai';
+  aiModel = 'gpt-3.5-turbo';
+
+  private modelsByProvider: Record<string, { models: string[], hint: string }> = {
+    openai: {
+      models: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4o', 'gpt-4o-mini', 'o1-mini', 'o1-preview'],
+      hint: 'OpenAI - Modelos GPT. gpt-4o-mini es rapido y economico.'
+    },
+    anthropic: {
+      models: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'],
+      hint: 'Anthropic Claude - Excelente razonamiento matematico.'
+    },
+    groq: {
+      models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'],
+      hint: 'Groq - Ultra rapido, modelos open source.'
+    },
+    openrouter: {
+      models: ['openai/gpt-4o', 'anthropic/claude-3.5-sonnet', 'meta-llama/llama-3.1-70b-instruct', 'google/gemini-pro-1.5'],
+      hint: 'OpenRouter - Acceso a multiples proveedores.'
+    }
+  };
+
+  availableModels = signal<string[]>(this.modelsByProvider['openai'].models);
+  modelHint = signal(this.modelsByProvider['openai'].hint);
+
   constructor(private http: HttpClient) {}
 
   ngOnInit() {
     this.loadUsers();
+  }
+
+  onProviderChange() {
+    const p = this.modelsByProvider[this.aiProvider];
+    this.availableModels.set(p.models);
+    this.modelHint.set(p.hint);
+    this.aiModel = p.models[0];
+  }
+
+  saveAIConfig() {
+    const keyName = this.aiProvider === 'openai' ? 'OPENAI_API_KEY' :
+                    this.aiProvider === 'anthropic' ? 'ANTHROPIC_API_KEY' :
+                    this.aiProvider === 'groq' ? 'GROQ_API_KEY' : 'OPENROUTER_API_KEY';
+    Promise.all([
+      this.saveSettingDirect('AI_PROVIDER', this.aiProvider, 'AI provider'),
+      this.saveSettingDirect('AI_MODEL', this.aiModel, 'AI model'),
+      this.saveSettingDirect('AI_API_KEY_NAME', keyName, 'API key setting name')
+    ]).then(() => this.showMessage('Configuracion IA guardada'));
+  }
+
+  private saveSettingDirect(key: string, value: string, description: string): Promise<any> {
+    return this.http.put(`${environment.apiUrl}/api/settings/${key}`, { key, value, description }).toPromise();
   }
 
   loadUsers() {
@@ -251,6 +324,11 @@ export class SettingsComponent implements OnInit {
         const math = s.find(x => x.key === 'MATH_SYSTEM_PROMPT');
         if (chat) this.chatPrompt = chat.value;
         if (math) this.mathPrompt = math.value;
+        const prov = s.find(x => x.key === 'AI_PROVIDER');
+        const model = s.find(x => x.key === 'AI_MODEL');
+        if (prov) this.aiProvider = prov.value;
+        if (model) this.aiModel = model.value;
+        if (prov) this.onProviderChange();
       },
       error: () => this.showMessage('Error al cargar configuraciones', 'error')
     });

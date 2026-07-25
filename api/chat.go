@@ -1,10 +1,8 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/brandall2021/matematicarag/internal/config"
@@ -98,48 +96,36 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			messages := []OpenAIMessage{{Role: "system", Content: customPrompt}}
 			messages = append(messages, history...)
 
-			// Call OpenAI
+			// Call AI
+			model := getModel(db, req.Model)
 			apiKey := getAPIKey(db)
 			if apiKey == "" {
-				http.Error(w, `{"error":"API key no configurada. Agrega OPENAI_API_KEY en Configuracion > API Keys"}`, http.StatusServiceUnavailable)
+				http.Error(w, `{"error":"API key no configurada. Agrega tu key en Configuracion > API Keys"}`, http.StatusServiceUnavailable)
 				return
 			}
 
-			model := req.Model
-			if model == "" {
-				model = "gpt-3.5-turbo"
+			provider := getProvider(db)
+			var response string
+			var callErr error
+
+			if provider == "anthropic" {
+				historyText := ""
+				for _, m := range history {
+					if m.Role == "user" {
+						historyText += m.Content + "\n"
+					} else {
+						historyText += "Asistente: " + m.Content + "\n"
+					}
+				}
+				response, callErr = callAnthropic(apiKey, model, customPrompt, historyText+req.Content)
+			} else {
+				response, callErr = callOpenAICompatible(provider, apiKey, model, customPrompt, req.Content)
 			}
 
-			reqBody := OpenAIRequest{
-				Model:     model,
-				Messages:  messages,
-				MaxTokens: 1024,
-			}
-			body, _ := json.Marshal(reqBody)
-			httpReq, _ := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewReader(body))
-			httpReq.Header.Set("Content-Type", "application/json")
-			httpReq.Header.Set("Authorization", "Bearer "+apiKey)
-
-			resp, err := http.DefaultClient.Do(httpReq)
-			if err != nil {
-				http.Error(w, `{"error":"error al conectar con OpenAI: `+err.Error()+`"}`, http.StatusBadGateway)
+			if callErr != nil {
+				http.Error(w, `{"error":"`+callErr.Error()+`"}`, http.StatusBadGateway)
 				return
 			}
-			defer resp.Body.Close()
-
-			var openAIResp OpenAIResponse
-			json.NewDecoder(resp.Body).Decode(&openAIResp)
-
-			if openAIResp.Error != nil {
-				http.Error(w, `{"error":"OpenAI: `+openAIResp.Error.Message+`"}`, http.StatusBadGateway)
-				return
-			}
-			if len(openAIResp.Choices) == 0 {
-				http.Error(w, `{"error":"sin respuesta de OpenAI"}`, http.StatusBadGateway)
-				return
-			}
-
-			response := strings.TrimSpace(openAIResp.Choices[0].Message.Content)
 
 			var assistantID string
 			err = db.QueryRow(r.Context(),
