@@ -65,5 +65,20 @@ func SettingsRoutes(db *pgxpool.Pool) func(r chi.Router) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(Setting{Key: key, Value: req.Value, Description: req.Description})
 		})
+
+		r.Delete("/{key}", func(w http.ResponseWriter, r *http.Request) {
+			key := chi.URLParam(r, "key")
+			result, err := db.Exec(r.Context(), `DELETE FROM app_settings WHERE key = $1`, key)
+			if err != nil {
+				http.Error(w, `{"error":"failed to delete setting"}`, http.StatusInternalServerError)
+				return
+			}
+			if result.RowsAffected() == 0 {
+				http.Error(w, `{"error":"setting not found"}`, http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+		})
 	}
 }
