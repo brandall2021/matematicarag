@@ -147,16 +147,14 @@ interface Setting {
               </button>
             </div>
 
-            <h3>Prompts personalizados</h3>
+            <h3>Prompt del Sistema</h3>
             <div class="prompt-card">
-              <label>Prompt del Chat (tutor de matematicas)</label>
-              <textarea [(ngModel)]="chatPrompt" placeholder="Sos un tutor de matematicas..." rows="4" class="form-textarea"></textarea>
-              <button mat-raised-button color="primary" (click)="savePrompt('CHAT_SYSTEM_PROMPT', chatPrompt)">Guardar prompt chat</button>
-            </div>
-            <div class="prompt-card">
-              <label>Prompt de Matematica (operaciones avanzadas)</label>
-              <textarea [(ngModel)]="mathPrompt" placeholder="Sos un experto en matematicas..." rows="4" class="form-textarea"></textarea>
-              <button mat-raised-button color="primary" (click)="savePrompt('MATH_SYSTEM_PROMPT', mathPrompt)">Guardar prompt matematica</button>
+              <label>Prompt general (chat + matematica)</label>
+              <textarea [(ngModel)]="systemPrompt" placeholder="Sos un tutor de matematicas de la UNT..." rows="5" class="form-textarea"></textarea>
+              <small class="model-hint">Se usa tanto para el chat como para las operaciones matematicas.</small>
+              <button mat-raised-button color="primary" (click)="savePrompt('SYSTEM_PROMPT', systemPrompt)" style="margin-top: 0.5rem">
+                <mat-icon>save</mat-icon> Guardar prompt
+              </button>
             </div>
           </div>
 
@@ -250,8 +248,7 @@ export class SettingsComponent implements OnInit {
   newUser = { name: '', lastName: '', email: '', password: '', role: 'STUDENT' };
   newKey = { key: '', value: '', description: '' };
   showValue: Record<string, boolean> = {};
-  chatPrompt = '';
-  mathPrompt = '';
+  systemPrompt = '';
   verifying = signal(false);
   verifyResult = signal('');
   verifyOk = signal(false);
@@ -320,10 +317,8 @@ export class SettingsComponent implements OnInit {
     this.http.get<Setting[]>(`${environment.apiUrl}/api/settings`).subscribe({
       next: (s) => {
         this.settings.set(s);
-        const chat = s.find(x => x.key === 'CHAT_SYSTEM_PROMPT');
-        const math = s.find(x => x.key === 'MATH_SYSTEM_PROMPT');
-        if (chat) this.chatPrompt = chat.value;
-        if (math) this.mathPrompt = math.value;
+        const prompt = s.find(x => x.key === 'SYSTEM_PROMPT');
+        if (prompt) this.systemPrompt = prompt.value;
         const prov = s.find(x => x.key === 'AI_PROVIDER');
         const model = s.find(x => x.key === 'AI_MODEL');
         if (prov) this.aiProvider = prov.value;

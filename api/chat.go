@@ -91,7 +91,7 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 
 			// Build messages with history
-			customPrompt := getSetting(db, "CHAT_SYSTEM_PROMPT")
+			customPrompt := getSetting(db, "SYSTEM_PROMPT")
 			if customPrompt == "" {
 				customPrompt = defaultChatPrompt
 			}
