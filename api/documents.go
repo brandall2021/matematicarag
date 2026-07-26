@@ -392,6 +392,7 @@ func generateEmbeddings(db *pgxpool.Pool, texts []string) ([][]float32, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("no API key for embeddings")
 	}
+	log.Printf("[EMBED] using key: %s... (len=%d)", apiKey[:min(len(apiKey), 8)], len(apiKey))
 
 	reqBody := map[string]interface{}{
 		"model": "text-embedding-3-small",
@@ -410,6 +411,7 @@ func generateEmbeddings(db *pgxpool.Pool, texts []string) ([][]float32, error) {
 	defer resp.Body.Close()
 
 	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("[EMBED] OpenAI response status: %d, body: %s", resp.StatusCode, string(respBody[:min(len(respBody), 500)]))
 	var result struct {
 		Data []struct {
 			Embedding []float32 `json:"embedding"`
