@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -22,14 +23,14 @@ import (
 )
 
 type Document struct {
-	ID           string `json:"id"`
-	Filename     string `json:"filename"`
-	OriginalName string `json:"originalName"`
-	Type         string `json:"type"`
-	Size         int64  `json:"size"`
-	Status       string `json:"status"`
-	ChunkCount   int    `json:"chunkCount"`
-	CreatedAt    string `json:"createdAt"`
+	ID           string    `json:"id"`
+	Filename     string    `json:"filename"`
+	OriginalName string    `json:"originalName"`
+	Type         string    `json:"type"`
+	Size         int64     `json:"size"`
+	Status       string    `json:"status"`
+	ChunkCount   int       `json:"chunkCount"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type DocumentChunk struct {
@@ -133,17 +134,19 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				return
 			}
 			defer rows.Close()
-			docs := make([]Document, 0)
-			for rows.Next() {
-				var d Document
-				if err := rows.Scan(&d.ID, &d.Filename, &d.OriginalName, &d.Type, &d.Size, &d.Status, &d.CreatedAt); err == nil {
-					if d.Status == "indexed" {
-						count, _ := qdrantCountByDocID(d.ID)
-						d.ChunkCount = count
-					}
-					docs = append(docs, d)
-				}
+	docs := make([]Document, 0)
+		for rows.Next() {
+			var d Document
+			if err := rows.Scan(&d.ID, &d.Filename, &d.OriginalName, &d.Type, &d.Size, &d.Status, &d.CreatedAt); err != nil {
+				log.Printf("[DOCS] scan error: %v", err)
+				continue
 			}
+			if d.Status == "indexed" {
+				count, _ := qdrantCountByDocID(d.ID)
+				d.ChunkCount = count
+			}
+			docs = append(docs, d)
+		}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(docs)
 		})
@@ -196,19 +199,24 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 
 func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string) {
 	ctx := context.Background()
+	log.Printf("[DOCS] processing document %s (%s)", docID, originalName)
+
 	pages, err := extractTextWithMetadata(filePath, ext)
 	if err != nil {
+		log.Printf("[DOCS] extract error for %s: %v", docID, err)
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
 
 	chunks := chunkTextWithMetadata(pages, 500, 50)
 	if len(chunks) == 0 {
+		log.Printf("[DOCS] no chunks for %s", docID)
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
 
 	if err := ensureQdrantCollection(); err != nil {
+		log.Printf("[DOCS] qdrant collection error for %s: %v", docID, err)
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
@@ -220,6 +228,7 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 
 	embeddings, err := generateEmbeddings(db, texts)
 	if err != nil {
+		log.Printf("[DOCS] embedding error for %s: %v", docID, err)
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
@@ -228,10 +237,13 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 
 	for i, chunk := range chunks {
 		chunkID := fmt.Sprintf("%s_%d", docID, i)
-		qdrantUpsert(docID, i, chunkID, embeddings[i], chunk.Text, originalName, chunk.Page, chunk.Section, docURL)
+		if err := qdrantUpsert(docID, i, chunkID, embeddings[i], chunk.Text, originalName, chunk.Page, chunk.Section, docURL); err != nil {
+			log.Printf("[DOCS] qdrant upsert error for %s chunk %d: %v", docID, i, err)
+		}
 	}
 
 	db.Exec(ctx, `UPDATE documents SET status = 'indexed' WHERE id = $1`, docID)
+	log.Printf("[DOCS] document %s indexed successfully (%d chunks)", docID, len(chunks))
 }
 
 func extractTextWithMetadata(filePath, ext string) ([]PageContent, error) {
