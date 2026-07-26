@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -24,8 +25,20 @@ type RagSource struct {
 	ID       string  `json:"id"`
 	Content  string  `json:"content"`
 	Score    float64 `json:"score"`
-	Metadata string  `json:"metadata"`
+	Filename string  `json:"filename"`
+	Page     int     `json:"page,omitempty"`
+	Section  string  `json:"section,omitempty"`
+	URL      string  `json:"url,omitempty"`
 }
+
+const defaultRAGPrompt = `Sos un tutor de matematicas de la UNT. Respondes usando la informacion de los documentos provistos como contexto.
+
+REGLAS DE CITACION:
+- SIEMPRE referencia las fuentes usando el formato: [Fuente: nombre_archivo, pagina X, seccion "Y"]
+- Si la informacion viene de un documento sin pagina conocida, usa: [Fuente: nombre_archivo]
+- Si la pregunta no esta en el contexto, lo indicas y respondes con tu conocimiento general
+- Puedes citar multiples fuentes en una misma respuesta
+- Las citas van al final de cada idea o parrafo relevante`
 
 func RagRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	return func(r chi.Router) {
@@ -44,7 +57,6 @@ func RagRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				req.TopK = 5
 			}
 
-			// Vector search
 			results, err := VectorSearch(db, req.Query, req.TopK)
 			if err != nil {
 				w.Header().Set("Content-Type", "application/json")
@@ -64,23 +76,26 @@ func RagRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				return
 			}
 
-			// Build context from search results
 			var contextParts []string
 			sources := make([]RagSource, len(results))
 			for i, res := range results {
-				contextParts = append(contextParts, res.Content)
+				sourceLabel := buildSourceLabel(res.Filename, res.Page, res.Section)
+				contextParts = append(contextParts, fmt.Sprintf("[Fuente: %s]\n%s", sourceLabel, res.Content))
 				sources[i] = RagSource{
 					ID:       res.ChunkID,
-					Content:  truncateString(res.Content, 200),
+					Content:  truncateString(res.Content, 300),
 					Score:    res.Score,
-					Metadata: res.Filename,
+					Filename: res.Filename,
+					Page:     res.Page,
+					Section:  res.Section,
+					URL:      res.URL,
 				}
 			}
 
-			// Generate answer using AI with context
-			systemPrompt := `Sos un tutor de matematicas de la UNT. Respondes en español usando la informacion de los documentos provistos como contexto.
-Si la pregunta no esta en el contexto, lo indicas y respondes con tu conocimiento general.
-Siempre citas de que documento sacas la informacion.`
+			systemPrompt := getSetting(db, "RAG_SYSTEM_PROMPT")
+			if systemPrompt == "" {
+				systemPrompt = defaultRAGPrompt
+			}
 
 			userPrompt := "Pregunta: " + req.Query + "\n\nContexto de documentos:\n" + strings.Join(contextParts, "\n---\n")
 
@@ -111,6 +126,17 @@ Siempre citas de que documento sacas la informacion.`
 			})
 		})
 	}
+}
+
+func buildSourceLabel(filename string, page int, section string) string {
+	parts := []string{filename}
+	if page > 0 {
+		parts = append(parts, fmt.Sprintf("pagina %d", page))
+	}
+	if section != "" {
+		parts = append(parts, fmt.Sprintf("seccion \"%s\"", section))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func truncateString(s string, n int) string {

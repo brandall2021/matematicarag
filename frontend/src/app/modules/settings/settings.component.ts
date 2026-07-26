@@ -164,6 +164,14 @@ interface Setting {
                 <mat-icon>save</mat-icon> Guardar prompt matematica
               </button>
             </div>
+            <div class="prompt-card">
+              <label>Prompt RAG (Documentos)</label>
+              <textarea [(ngModel)]="ragSystemPrompt" placeholder="Sos un tutor de matematicas. Cita tus fuentes..." rows="5" class="form-textarea"></textarea>
+              <small class="model-hint">Se usa para consultas RAG con documentos indexados. Define como citar fuentes.</small>
+              <button mat-raised-button color="primary" (click)="savePrompt('RAG_SYSTEM_PROMPT', ragSystemPrompt)" style="margin-top: 0.5rem">
+                <mat-icon>save</mat-icon> Guardar prompt RAG
+              </button>
+            </div>
           </div>
 
           <div class="settings-list">
@@ -259,6 +267,7 @@ export class SettingsComponent implements OnInit {
   showValue: Record<string, boolean> = {};
   chatSystemPrompt = '';
   mathSystemPrompt = '';
+  ragSystemPrompt = '';
   verifying = signal(false);
   verifyResult = signal('');
   verifyOk = signal(false);
@@ -329,9 +338,11 @@ export class SettingsComponent implements OnInit {
         this.settings.set(s);
         const chatPrompt = s.find(x => x.key === 'CHAT_SYSTEM_PROMPT');
         const mathPrompt = s.find(x => x.key === 'MATH_SYSTEM_PROMPT');
+        const ragPrompt = s.find(x => x.key === 'RAG_SYSTEM_PROMPT');
         const legacyPrompt = s.find(x => x.key === 'SYSTEM_PROMPT');
         if (chatPrompt) this.chatSystemPrompt = chatPrompt.value;
         if (mathPrompt) this.mathSystemPrompt = mathPrompt.value;
+        if (ragPrompt) this.ragSystemPrompt = ragPrompt.value;
         if (!chatPrompt && !mathPrompt && legacyPrompt) {
           this.chatSystemPrompt = legacyPrompt.value;
           this.mathSystemPrompt = legacyPrompt.value;
@@ -373,8 +384,13 @@ export class SettingsComponent implements OnInit {
   }
 
   savePrompt(key: string, value: string) {
+    const descriptions: Record<string, string> = {
+      'CHAT_SYSTEM_PROMPT': 'Custom chat system prompt',
+      'MATH_SYSTEM_PROMPT': 'Custom math system prompt',
+      'RAG_SYSTEM_PROMPT': 'Custom RAG system prompt for document queries'
+    };
     this.http.put(`${environment.apiUrl}/api/settings/${key}`, {
-      key, value, description: key === 'CHAT_SYSTEM_PROMPT' ? 'Custom chat system prompt' : 'Custom math system prompt'
+      key, value, description: descriptions[key] || 'Custom prompt'
     }).subscribe({
       next: () => this.showMessage('Prompt guardado'),
       error: () => this.showMessage('Error al guardar prompt', 'error')

@@ -148,16 +148,27 @@ func ensureQdrantCollection() error {
 	return nil
 }
 
-func qdrantUpsert(docID string, chunkIndex int, chunkID string, embedding []float32, content string, filename string) error {
+func qdrantUpsert(docID string, chunkIndex int, chunkID string, embedding []float32, content string, filename string, page int, section string, url string) error {
+	payload := map[string]interface{}{
+		"document_id":  docID,
+		"chunk_index":  chunkIndex,
+		"content":      content,
+		"filename":     filename,
+	}
+	if page > 0 {
+		payload["page"] = page
+	}
+	if section != "" {
+		payload["section"] = section
+	}
+	if url != "" {
+		payload["url"] = url
+	}
+
 	point := QdrantPoint{
-		ID:     chunkID,
-		Vector: embedding,
-		Payload: map[string]interface{}{
-			"document_id":  docID,
-			"chunk_index":  chunkIndex,
-			"content":      content,
-			"filename":     filename,
-		},
+		ID:      chunkID,
+		Vector:  embedding,
+		Payload: payload,
 	}
 
 	req := QdrantUpsertRequest{

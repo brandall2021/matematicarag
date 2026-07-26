@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -75,7 +76,6 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				return
 			}
 
-			// Get history for context
 			historyRows, _ := db.Query(r.Context(),
 				`SELECT role, content FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC`, req.SessionID)
 			var history []OpenAIMessage
@@ -90,16 +90,30 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				}
 			}
 
-			// Build messages with history
+			ragSources, ragContext := performRAGSearch(db, req.Content)
+
 			customPrompt := getSetting(db, "CHAT_SYSTEM_PROMPT")
 			if customPrompt == "" {
 				customPrompt = defaultChatPrompt
 			}
-			messages := []OpenAIMessage{{Role: "system", Content: customPrompt}}
-			messages = append(messages, history...)
-			messages = append(messages, OpenAIMessage{Role: "user", Content: req.Content})
 
-			// Call AI
+			if ragContext != "" {
+				customPrompt += "\n\nTenes acceso a documentos de referencia. Usa la siguiente informacion para responder cuando sea relevante. Cita las fuentes usando el formato: [Fuente: nombre_archivo, pagina X]."
+			}
+
+			var messages []OpenAIMessage
+			if ragContext != "" {
+				messages = []OpenAIMessage{
+					{Role: "system", Content: customPrompt},
+				}
+				messages = append(messages, history...)
+				messages = append(messages, OpenAIMessage{Role: "user", Content: req.Content + "\n\nContexto de documentos:\n" + ragContext})
+			} else {
+				messages = []OpenAIMessage{{Role: "system", Content: customPrompt}}
+				messages = append(messages, history...)
+				messages = append(messages, OpenAIMessage{Role: "user", Content: req.Content})
+			}
+
 			model := getModel(db, req.Model)
 			apiKey := getAPIKey(db)
 			if apiKey == "" {
@@ -114,10 +128,15 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				return
 			}
 
+			var sourcesJSON json.RawMessage
+			if len(ragSources) > 0 {
+				sourcesJSON, _ = json.Marshal(ragSources)
+			}
+
 			var assistantID string
 			err = db.QueryRow(r.Context(),
-				`INSERT INTO chat_messages (session_id, role, content, model) VALUES ($1, 'ASSISTANT', $2, $3) RETURNING id`,
-				req.SessionID, response, model,
+				`INSERT INTO chat_messages (session_id, role, content, model, sources) VALUES ($1, 'ASSISTANT', $2, $3, $4) RETURNING id`,
+				req.SessionID, response, model, sourcesJSON,
 			).Scan(&assistantID)
 			if err != nil {
 				http.Error(w, `{"error":"failed to save response"}`, http.StatusInternalServerError)
@@ -128,7 +147,7 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(ChatMessage{
 				ID: assistantID, Role: "ASSISTANT", Content: response,
-				Model: model, CreatedAt: time.Now(),
+				Model: model, Sources: sourcesJSON, CreatedAt: time.Now(),
 			})
 		})
 
@@ -203,4 +222,29 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-3] + "..."
+}
+
+func performRAGSearch(db *pgxpool.Pool, query string) ([]RagSource, string) {
+	results, err := VectorSearch(db, query, 5)
+	if err != nil || len(results) == 0 {
+		return nil, ""
+	}
+
+	var contextParts []string
+	sources := make([]RagSource, len(results))
+	for i, res := range results {
+		sourceLabel := buildSourceLabel(res.Filename, res.Page, res.Section)
+		contextParts = append(contextParts, fmt.Sprintf("[Fuente: %s]\n%s", sourceLabel, res.Content))
+		sources[i] = RagSource{
+			ID:       res.ChunkID,
+			Content:  truncateString(res.Content, 300),
+			Score:    res.Score,
+			Filename: res.Filename,
+			Page:     res.Page,
+			Section:  res.Section,
+			URL:      res.URL,
+		}
+	}
+
+	return sources, strings.Join(contextParts, "\n---\n")
 }

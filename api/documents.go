@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -37,6 +38,8 @@ type DocumentChunk struct {
 	ChunkIndex int    `json:"chunkIndex"`
 	Content    string `json:"content"`
 	Filename   string `json:"filename,omitempty"`
+	Page       int    `json:"page,omitempty"`
+	Section    string `json:"section,omitempty"`
 }
 
 type VectorSearchResult struct {
@@ -45,6 +48,20 @@ type VectorSearchResult struct {
 	Content  string  `json:"content"`
 	Score    float64 `json:"score"`
 	Filename string  `json:"filename"`
+	Page     int     `json:"page"`
+	Section  string  `json:"section"`
+	URL      string  `json:"url"`
+}
+
+type PageContent struct {
+	Page int
+	Text string
+}
+
+type ChunkMeta struct {
+	Text    string
+	Page    int
+	Section string
 }
 
 var uploadDir = "./uploads"
@@ -134,8 +151,6 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 		r.Get("/{id}/chunks", func(w http.ResponseWriter, r *http.Request) {
 			docID := chi.URLParam(r, "id")
 
-			// Search Qdrant for all chunks of this document
-			// Use a zero vector with filter to get all chunks
 			results, err := qdrantSearchByDocID(docID, 500)
 			if err != nil {
 				http.Error(w, `{"error":"failed to get chunks"}`, http.StatusInternalServerError)
@@ -150,6 +165,12 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 					ChunkIndex: int(res.Payload["chunk_index"].(float64)),
 					Content:    res.Payload["content"].(string),
 					Filename:   fmt.Sprintf("%v", res.Payload["filename"]),
+				}
+				if v, ok := res.Payload["page"].(float64); ok {
+					chunks[i].Page = int(v)
+				}
+				if v, ok := res.Payload["section"].(string); ok {
+					chunks[i].Section = v
 				}
 			}
 
@@ -175,67 +196,87 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 
 func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string) {
 	ctx := context.Background()
-	text, err := extractText(filePath, ext)
+	pages, err := extractTextWithMetadata(filePath, ext)
 	if err != nil {
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
 
-	chunks := chunkText(text, 500, 50)
+	chunks := chunkTextWithMetadata(pages, 500, 50)
 	if len(chunks) == 0 {
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
 
-	// Ensure Qdrant collection exists
 	if err := ensureQdrantCollection(); err != nil {
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
 
-	embeddings, err := generateEmbeddings(db, chunks)
+	texts := make([]string, len(chunks))
+	for i, c := range chunks {
+		texts[i] = c.Text
+	}
+
+	embeddings, err := generateEmbeddings(db, texts)
 	if err != nil {
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
 	}
 
+	docURL := fmt.Sprintf("/documents?id=%s", docID)
+
 	for i, chunk := range chunks {
 		chunkID := fmt.Sprintf("%s_%d", docID, i)
-		qdrantUpsert(docID, i, chunkID, embeddings[i], chunk, originalName)
+		qdrantUpsert(docID, i, chunkID, embeddings[i], chunk.Text, originalName, chunk.Page, chunk.Section, docURL)
 	}
 
 	db.Exec(ctx, `UPDATE documents SET status = 'indexed' WHERE id = $1`, docID)
 }
 
-func extractText(filePath, ext string) (string, error) {
+func extractTextWithMetadata(filePath, ext string) ([]PageContent, error) {
 	switch ext {
+	case ".pdf":
+		return extractPDFTextWithPages(filePath)
 	case ".txt", ".md":
 		data, err := os.ReadFile(filePath)
-		return string(data), err
-	case ".pdf":
-		return extractPDFText(filePath)
+		if err != nil {
+			return nil, err
+		}
+		return []PageContent{{Page: 0, Text: string(data)}}, nil
 	case ".docx":
-		return extractDOCXText(filePath)
+		text, err := extractDOCXText(filePath)
+		if err != nil {
+			return nil, err
+		}
+		return []PageContent{{Page: 0, Text: text}}, nil
 	}
-	return "", fmt.Errorf("unsupported type: %s", ext)
+	return nil, fmt.Errorf("unsupported type: %s", ext)
 }
 
-func extractPDFText(filePath string) (string, error) {
+func extractPDFTextWithPages(filePath string) ([]PageContent, error) {
 	f, r, err := pdf.Open(filePath)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer f.Close()
 
-	reader, err := r.GetPlainText()
-	if err != nil {
-		return "", err
+	numPages := r.NumPage()
+	var pages []PageContent
+
+	for i := 1; i <= numPages; i++ {
+		page := r.Page(i)
+		text, err := page.GetPlainText(nil)
+		if err != nil || strings.TrimSpace(text) == "" {
+			continue
+		}
+		pages = append(pages, PageContent{Page: i, Text: text})
 	}
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		return "", err
+
+	if len(pages) == 0 {
+		return nil, fmt.Errorf("no text content found in PDF")
 	}
-	return string(data), nil
+	return pages, nil
 }
 
 func extractDOCXText(filePath string) (string, error) {
@@ -274,29 +315,57 @@ func extractDOCXText(filePath string) (string, error) {
 	return "", fmt.Errorf("word/document.xml not found")
 }
 
-func chunkText(text string, chunkSize, overlap int) []string {
-	text = strings.TrimSpace(text)
-	if len(text) == 0 {
-		return nil
-	}
+var sectionRe = regexp.MustCompile(`^(?:(?:capitulo|cap\.?|chapter)\s+\d+|(?:\d{1,3}(?:\.\d{1,3}){0,2})\s+[A-ZÁÉÍÓÚÑ].{2,60}|#{1,3}\s+.+|(?:introduccion|conclusion|resumen|bibliografia|referencias|appendix|anexo).*)$`)
 
-	runes := []rune(text)
-	var chunks []string
+func detectSection(line string) string {
+	trimmed := strings.TrimSpace(line)
+	if len(trimmed) < 3 || len(trimmed) > 100 {
+		return ""
+	}
+	lower := strings.ToLower(trimmed)
+	if sectionRe.MatchString(lower) {
+		return trimmed
+	}
+	return ""
+}
 
-	for i := 0; i < len(runes); i += chunkSize - overlap {
-		end := i + chunkSize
-		if end > len(runes) {
-			end = len(runes)
+func chunkTextWithMetadata(pages []PageContent, chunkSize, overlap int) []ChunkMeta {
+	var allChunks []ChunkMeta
+	currentSection := ""
+
+	for _, page := range pages {
+		text := strings.TrimSpace(page.Text)
+		if len(text) == 0 {
+			continue
 		}
-		chunk := strings.TrimSpace(string(runes[i:end]))
-		if len(chunk) > 20 {
-			chunks = append(chunks, chunk)
+
+		lines := strings.Split(text, "\n")
+		for _, line := range lines {
+			if s := detectSection(line); s != "" {
+				currentSection = s
+			}
 		}
-		if end >= len(runes) {
-			break
+
+		runes := []rune(text)
+		for i := 0; i < len(runes); i += chunkSize - overlap {
+			end := i + chunkSize
+			if end > len(runes) {
+				end = len(runes)
+			}
+			chunk := strings.TrimSpace(string(runes[i:end]))
+			if len(chunk) > 20 {
+				allChunks = append(allChunks, ChunkMeta{
+					Text:    chunk,
+					Page:    page.Page,
+					Section: currentSection,
+				})
+			}
+			if end >= len(runes) {
+				break
+			}
 		}
 	}
-	return chunks
+	return allChunks
 }
 
 func generateEmbeddings(db *pgxpool.Pool, texts []string) ([][]float32, error) {
@@ -376,13 +445,23 @@ func VectorSearch(db *pgxpool.Pool, query string, topK int) ([]VectorSearchResul
 
 	searchResults := make([]VectorSearchResult, len(results))
 	for i, r := range results {
-		searchResults[i] = VectorSearchResult{
+		sr := VectorSearchResult{
 			ChunkID:  r.ID,
 			DocID:    fmt.Sprintf("%v", r.Payload["document_id"]),
 			Content:  r.Payload["content"].(string),
 			Score:    r.Score,
 			Filename: fmt.Sprintf("%v", r.Payload["filename"]),
 		}
+		if v, ok := r.Payload["page"].(float64); ok {
+			sr.Page = int(v)
+		}
+		if v, ok := r.Payload["section"].(string); ok {
+			sr.Section = v
+		}
+		if v, ok := r.Payload["url"].(string); ok {
+			sr.URL = v
+		}
+		searchResults[i] = sr
 	}
 	return searchResults, nil
 }
