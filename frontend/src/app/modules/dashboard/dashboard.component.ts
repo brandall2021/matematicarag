@@ -18,9 +18,11 @@ import { ApiService } from '../../core/services/api.service';
     </div>
   `,
   styles: [`
-    .container { padding: 2rem; max-width: 800px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .container { padding: 1.5rem; max-width: 800px; margin: 0 auto; background: var(--bg); color: var(--text); }
+    @media (min-width: 768px) { .container { padding: 2rem; } }
     h1 { color: var(--accent); }
     .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-top: 2rem; }
+    @media (max-width: 767px) { .stats-grid { grid-template-columns: 1fr; } }
     .stat-card { background: var(--surface); padding: 2rem; border-radius: 12px; text-align: center; }
     .stat-card h3 { font-size: 2.5rem; color: var(--accent); margin: 0; }
     .stat-card p { color: var(--text-secondary); margin-top: 0.5rem; }

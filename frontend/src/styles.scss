@@ -32,6 +32,11 @@ body {
   box-sizing: border-box;
 }
 
+:root {
+  --bp-tablet: 768px;
+  --bp-desktop: 1024px;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

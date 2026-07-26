@@ -26,10 +26,11 @@ import { MatButtonModule } from '@angular/material/button';
     </div>
   `,
   styles: [`
-    .chat-container { display: flex; height: 100vh; }
+    .chat-container { display: flex; height: 100%; }
     .main-chat { flex: 1; display: flex; flex-direction: column; }
     .messages { flex: 1; overflow-y: auto; padding: 1rem; }
     .message { margin-bottom: 1rem; max-width: 70%; }
+    @media (max-width: 767px) { .message { max-width: 85%; } }
     .message.user { margin-left: auto; }
     .message.assistant { margin-right: auto; }
     .message-content { padding: 0.75rem 1rem; border-radius: 12px; line-height: 1.5; }

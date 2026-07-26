@@ -200,16 +200,17 @@ interface Setting {
     </div>
   `,
   styles: [`
-    .settings-container { padding: 2rem; max-width: 900px; margin: 0 auto; }
+    .settings-container { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
+    @media (min-width: 768px) { .settings-container { padding: 2rem; } }
     h1 { color: var(--accent); margin-bottom: 1.5rem; }
     h2 { color: var(--text); margin-bottom: 1rem; font-size: 1.1rem; }
-    .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
     .tabs button { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border: none; background: var(--surface); color: var(--text-secondary); cursor: pointer; border-radius: 8px; font-size: 0.9rem; }
     .tabs button.active { background: var(--accent); color: var(--bg); font-weight: 600; }
     .tabs button:hover:not(.active) { background: var(--border); }
     .tabs button mat-icon { font-size: 18px; width: 18px; height: 18px; }
     .section { background: var(--surface); border-radius: 12px; padding: 1.5rem; }
-    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem; }
     .section-header h2 { margin: 0; }
     .create-form { background: var(--bg); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
     .form-input, .form-select { padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 0.9rem; outline: none; }
@@ -227,7 +228,7 @@ interface Setting {
     .setting-header { margin-bottom: 0.5rem; }
     .setting-key { font-weight: 600; color: var(--accent); font-size: 0.9rem; }
     .setting-desc { color: var(--text-secondary); font-size: 0.8rem; margin-left: 0.5rem; }
-    .setting-row { display: flex; gap: 0.5rem; align-items: center; }
+    .setting-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
     .setting-input { flex: 1; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 0.9rem; outline: none; font-family: monospace; }
     .setting-input:focus { border-color: var(--accent); }
     .message { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; background: #1b5e20; color: white; text-align: center; }

@@ -123,10 +123,12 @@ interface Chunk {
     </div>
   `,
   styles: [`
-    .container { padding: 2rem; max-width: 900px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .container { padding: 1.5rem; max-width: 900px; margin: 0 auto; background: var(--bg); color: var(--text); }
+    @media (min-width: 768px) { .container { padding: 2rem; } }
     h1 { color: var(--accent); margin-bottom: 0.25rem; }
     .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.9rem; }
-    .upload-area { border: 2px dashed var(--border); border-radius: 12px; padding: 2.5rem; text-align: center; background: var(--surface); transition: border-color 0.2s; cursor: pointer; }
+    .upload-area { border: 2px dashed var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; background: var(--surface); transition: border-color 0.2s; cursor: pointer; }
+    @media (min-width: 768px) { .upload-area { padding: 2.5rem; } }
     .upload-area.drag-active { border-color: var(--accent); background: var(--bg); }
     .upload-icon { font-size: 48px; width: 48px; height: 48px; color: var(--text-secondary); margin-bottom: 0.5rem; }
     .upload-progress { display: flex; align-items: center; gap: 0.5rem; padding: 1rem; background: var(--surface); border-radius: 8px; margin-top: 1rem; color: var(--accent); }
@@ -135,7 +137,7 @@ interface Chunk {
     .msg { margin-top: 1rem; padding: 0.75rem; border-radius: 8px; background: #1b5e20; color: white; text-align: center; font-size: 0.9rem; }
     .msg.error { background: #b71c1c; }
     .doc-list { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
-    .doc-card { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--surface); border-radius: 8px; }
+    .doc-card { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--surface); border-radius: 8px; flex-wrap: wrap; }
     .doc-icon mat-icon { font-size: 32px; width: 32px; height: 32px; }
     .doc-info { flex: 1; }
     .doc-name { font-weight: 600; font-size: 0.95rem; }

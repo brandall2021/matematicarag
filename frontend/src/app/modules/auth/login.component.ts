@@ -38,7 +38,7 @@ import { MatButtonModule } from '@angular/material/button';
   `,
   styles: [`
     .auth-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; background: var(--bg); }
-    .auth-card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 400px; }
+    .auth-card { background: var(--surface); padding: 2rem; border-radius: 12px; width: 90%; max-width: 400px; }
     h1 { color: var(--accent); text-align: center; font-family: 'Newsreader', serif; }
     .subtitle { color: var(--text-secondary); text-align: center; margin-bottom: 2rem; }
     .full-width { width: 100%; }

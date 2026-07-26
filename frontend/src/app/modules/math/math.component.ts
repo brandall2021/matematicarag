@@ -52,7 +52,8 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
     </div>
   `,
   styles: [`
-    .math-container { padding: 2rem; max-width: 900px; margin: 0 auto; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .math-container { padding: 1.5rem; max-width: 900px; margin: 0 auto; background: var(--bg); color: var(--text); }
+    @media (min-width: 768px) { .math-container { padding: 2rem; } }
     h1 { color: var(--accent); font-family: 'Newsreader', serif; margin-bottom: 1.5rem; }
     .mathfield-wrapper { background: var(--surface); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 2px solid var(--border); }
     .mathfield-wrapper:focus-within { border-color: var(--accent); }
@@ -67,7 +68,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
     :host ::ng-deep .ML__virtual-keyboard {
       background: var(--surface) !important;
     }
-    .input-area { display: flex; gap: 0.5rem; margin-bottom: 2rem; align-items: center; }
+    .input-area { display: flex; gap: 0.5rem; margin-bottom: 2rem; align-items: center; flex-wrap: wrap; }
     .latex-preview { flex: 1; display: flex; align-items: center; gap: 0.5rem; background: var(--surface); padding: 0.75rem 1rem; border-radius: 8px; }
     .latex-label { color: var(--text-secondary); font-size: 0.8rem; font-weight: 600; }
     .latex-preview code { color: var(--accent); font-size: 0.95rem; word-break: break-all; }
