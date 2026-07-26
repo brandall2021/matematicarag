@@ -237,7 +237,7 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 
 	allOK := true
 	for i, chunk := range chunks {
-		chunkID := fmt.Sprintf("%s_%d", docID, i)
+		chunkID := generateChunkID(docID, i)
 		if err := qdrantUpsert(docID, i, chunkID, embeddings[i], chunk.Text, originalName, chunk.Page, chunk.Section, docURL); err != nil {
 			log.Printf("[DOCS] qdrant upsert error for %s chunk %d: %v", docID, i, err)
 			allOK = false

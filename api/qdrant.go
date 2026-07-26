@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -65,6 +66,11 @@ type QdrantCollectionInfo struct {
 	Result struct {
 		Status string `json:"status"`
 	} `json:"result"`
+}
+
+func generateChunkID(docID string, chunkIndex int) string {
+	h := md5.Sum([]byte(fmt.Sprintf("%s_%d", docID, chunkIndex)))
+	return fmt.Sprintf("%x-%x-%x-%x-%x", h[0:4], h[4:6], h[6:8], h[8:10], h[10:])
 }
 
 func qdrantRequest(method, path string, body interface{}) ([]byte, error) {
