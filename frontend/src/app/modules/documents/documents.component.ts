@@ -251,14 +251,14 @@ export class DocumentsComponent implements OnDestroy {
             } else if (doc.status === 'error') {
               this.showMsg('Error al procesar el documento', true);
             }
-          } else if (attempts >= 30) {
+          } else if (attempts >= 20) {
             this.stopPolling();
             this.processingDoc.set('');
             this.showMsg('Tarde mas de lo esperado. Refresca para ver el estado.', true);
           }
         }
       });
-    }, 2000);
+    }, 5000);
   }
 
   private stopPolling() {

@@ -15,6 +15,7 @@ export const routes: Routes = [
       { path: 'chat', loadComponent: () => import('./modules/chat/chat.component').then(m => m.ChatComponent) },
       { path: 'math', loadComponent: () => import('./modules/math/math.component').then(m => m.MathComponent) },
       { path: 'documents', loadComponent: () => import('./modules/documents/documents.component').then(m => m.DocumentsComponent) },
+      { path: 'bdvectorial', loadComponent: () => import('./modules/bdvectorial/bdvectorial.component').then(m => m.BdvectorialComponent) },
       { path: 'history', loadComponent: () => import('./modules/history/history.component').then(m => m.HistoryComponent) },
       { path: 'dashboard', loadComponent: () => import('./modules/dashboard/dashboard.component').then(m => m.DashboardComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'TEACHER'] } },
       { path: 'settings', loadComponent: () => import('./modules/settings/settings.component').then(m => m.SettingsComponent), canActivate: [roleGuard], data: { roles: ['ADMIN'] } },

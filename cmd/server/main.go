@@ -40,7 +40,7 @@ func main() {
 	apiRouter.Use(chimw.Recoverer)
 	apiRouter.Use(chimw.Timeout(60 * time.Second))
 	apiRouter.Use(middleware.CORS(cfg.CORSOriginsList()))
-	apiRouter.Use(middleware.RateLimit(30))
+	apiRouter.Use(middleware.RateLimit(120))
 
 	apiRouter.Route("/api", func(r chi.Router) {
 		r.Route("/auth", api.AuthRoutes(db, cfg))
