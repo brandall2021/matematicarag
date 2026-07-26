@@ -1,4 +1,4 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -21,8 +21,7 @@ interface Chunk {
   documentId: string;
   chunkIndex: number;
   content: string;
-  metadata: any;
-  createdAt: string;
+  filename: string;
 }
 
 @Component({
@@ -49,7 +48,13 @@ interface Chunk {
 
       @if (uploading()) {
         <div class="upload-progress">
-          <mat-icon class="spin">sync</mat-icon> Subiendo y procesando...
+          <mat-icon class="spin">sync</mat-icon> Subiendo archivo...
+        </div>
+      }
+
+      @if (processingDoc()) {
+        <div class="upload-progress">
+          <mat-icon class="spin">sync</mat-icon> Indexando en la base vectorial... ({{ processingDoc() }})
         </div>
       }
 
@@ -104,13 +109,19 @@ interface Chunk {
       @if (selectedDoc()) {
         <div class="chunks-panel">
           <div class="chunks-header">
-            <h3>Chunks vectoriales: {{ selectedDoc()!.originalName }}</h3>
+            <div class="chunks-title">
+              <h3>{{ selectedDoc()!.originalName }}</h3>
+              <span class="chunks-stats">{{ chunks().length }} chunks &middot; {{ totalChars() }} caracteres &middot; {{ totalWords() }} palabras</span>
+            </div>
             <button mat-icon-button (click)="selectedDoc.set(null)"><mat-icon>close</mat-icon></button>
           </div>
           <div class="chunks-list">
-            @for (chunk of chunks(); track chunk.id; let i = $index) {
+            @for (chunk of chunks(); track chunk.id) {
               <div class="chunk-card">
-                <div class="chunk-index">#{{ i + 1 }}</div>
+                <div class="chunk-header">
+                  <span class="chunk-index">Chunk #{{ chunk.chunkIndex + 1 }}</span>
+                  <span class="chunk-size">{{ chunk.content.length }} chars &middot; {{ countWords(chunk.content) }} words</span>
+                </div>
                 <div class="chunk-content">{{ chunk.content }}</div>
               </div>
             }
@@ -139,9 +150,9 @@ interface Chunk {
     .doc-list { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
     .doc-card { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: var(--surface); border-radius: 8px; flex-wrap: wrap; }
     .doc-icon mat-icon { font-size: 32px; width: 32px; height: 32px; }
-    .doc-info { flex: 1; }
-    .doc-name { font-weight: 600; font-size: 0.95rem; }
-    .doc-meta { color: var(--text-secondary); font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem; }
+    .doc-info { flex: 1; min-width: 0; }
+    .doc-name { font-weight: 600; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-meta { color: var(--text-secondary); font-size: 0.8rem; display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
     .status { display: inline-flex; align-items: center; gap: 0.2rem; }
     .status mat-icon { font-size: 14px; width: 14px; height: 14px; }
     .status.indexed { color: #4caf50; }
@@ -150,26 +161,37 @@ interface Chunk {
     .doc-actions { display: flex; gap: 0.5rem; align-items: center; }
     .empty { text-align: center; padding: 2rem; color: var(--text-secondary); background: var(--surface); border-radius: 8px; }
     .chunks-panel { margin-top: 1.5rem; background: var(--surface); border-radius: 12px; padding: 1.5rem; }
-    .chunks-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-    .chunks-header h3 { margin: 0; color: var(--accent); font-size: 1rem; }
-    .chunks-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 500px; overflow-y: auto; }
+    .chunks-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; gap: 1rem; }
+    .chunks-title { flex: 1; min-width: 0; }
+    .chunks-title h3 { margin: 0 0 0.25rem 0; color: var(--accent); font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chunks-stats { color: var(--text-secondary); font-size: 0.8rem; }
+    .chunks-list { display: flex; flex-direction: column; gap: 0.75rem; max-height: 60vh; overflow-y: auto; }
     .chunk-card { background: var(--bg); padding: 1rem; border-radius: 8px; border-left: 3px solid var(--accent); }
-    .chunk-index { font-size: 0.75rem; color: var(--accent); font-weight: 600; margin-bottom: 0.3rem; }
-    .chunk-content { font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .chunk-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+    .chunk-index { font-size: 0.8rem; color: var(--accent); font-weight: 600; }
+    .chunk-size { font-size: 0.75rem; color: var(--text-secondary); }
+    .chunk-content { font-size: 0.85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
   `]
 })
-export class DocumentsComponent {
+export class DocumentsComponent implements OnDestroy {
   docs = signal<Doc[]>([]);
   chunks = signal<Chunk[]>([]);
   selectedDoc = signal<Doc | null>(null);
   loading = signal(false);
   uploading = signal(false);
+  processingDoc = signal('');
   message = signal('');
   msgError = signal(false);
   dragActive = false;
 
+  private pollTimer: any = null;
+
   constructor(private http: HttpClient) {
     this.loadDocs();
+  }
+
+  ngOnDestroy() {
+    this.stopPolling();
   }
 
   loadDocs() {
@@ -197,11 +219,13 @@ export class DocumentsComponent {
     this.message.set('');
     const fd = new FormData();
     fd.append('file', file);
-    this.http.post(`${environment.apiUrl}/api/documents/upload`, fd).subscribe({
-      next: () => {
+    this.http.post<any>(`${environment.apiUrl}/api/documents/upload`, fd).subscribe({
+      next: (res) => {
         this.uploading.set(false);
-        this.showMsg('Documento subido y procesado correctamente');
-        setTimeout(() => this.loadDocs(), 1000);
+        const docName = res.originalName || file.name;
+        this.processingDoc.set(docName);
+        this.showMsg('Documento subido. Indexando en la base vectorial...');
+        this.startPolling(res.id || res.filename);
       },
       error: (err) => {
         this.uploading.set(false);
@@ -210,10 +234,47 @@ export class DocumentsComponent {
     });
   }
 
+  private startPolling(docId: string) {
+    this.stopPolling();
+    let attempts = 0;
+    this.pollTimer = setInterval(() => {
+      attempts++;
+      this.http.get<Doc[]>(`${environment.apiUrl}/api/documents`).subscribe({
+        next: (docs) => {
+          this.docs.set(docs);
+          const doc = docs.find(d => d.id === docId);
+          if (doc && doc.status !== 'processing') {
+            this.stopPolling();
+            this.processingDoc.set('');
+            if (doc.status === 'indexed') {
+              this.showMsg('Documento indexado correctamente');
+            } else if (doc.status === 'error') {
+              this.showMsg('Error al procesar el documento', true);
+            }
+          } else if (attempts >= 30) {
+            this.stopPolling();
+            this.processingDoc.set('');
+            this.showMsg('Tarde mas de lo esperado. Refresca para ver el estado.', true);
+          }
+        }
+      });
+    }, 2000);
+  }
+
+  private stopPolling() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+
   viewChunks(doc: Doc) {
     this.selectedDoc.set(doc);
     this.http.get<Chunk[]>(`${environment.apiUrl}/api/documents/${doc.id}/chunks`).subscribe({
-      next: (c) => this.chunks.set(c),
+      next: (c) => {
+        const sorted = [...c].sort((a, b) => a.chunkIndex - b.chunkIndex);
+        this.chunks.set(sorted);
+      },
       error: () => this.chunks.set([])
     });
   }
@@ -226,6 +287,18 @@ export class DocumentsComponent {
     });
   }
 
+  totalChars(): number {
+    return this.chunks().reduce((sum, c) => sum + c.content.length, 0);
+  }
+
+  totalWords(): number {
+    return this.chunks().reduce((sum, c) => sum + this.countWords(c.content), 0);
+  }
+
+  countWords(text: string): number {
+    return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  }
+
   formatSize(bytes: number): string {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
@@ -235,6 +308,6 @@ export class DocumentsComponent {
   private showMsg(msg: string, error = false) {
     this.message.set(msg);
     this.msgError.set(error);
-    setTimeout(() => this.message.set(''), 3000);
+    setTimeout(() => this.message.set(''), 5000);
   }
 }

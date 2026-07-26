@@ -136,7 +136,7 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 
 			// Search Qdrant for all chunks of this document
 			// Use a zero vector with filter to get all chunks
-			results, err := qdrantSearchByDocID(docID, 100)
+			results, err := qdrantSearchByDocID(docID, 500)
 			if err != nil {
 				http.Error(w, `{"error":"failed to get chunks"}`, http.StatusInternalServerError)
 				return
