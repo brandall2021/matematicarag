@@ -14,6 +14,7 @@ var (
 	qdrantURL    = "http://sistemas-qdrant-gjlncs-qdrant-1:6333"
 	qdrantAPIKey = "0ylktnefcidr4f6dvkmwfoxc4nrgtywh"
 	collection   = "matematica_chunks"
+	qdrantClient = &http.Client{Timeout: 30 * time.Second}
 )
 
 func init() {
@@ -85,7 +86,7 @@ func qdrantRequest(method, path string, body interface{}) ([]byte, error) {
 		req.Header.Set("api-key", qdrantAPIKey)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := qdrantClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("qdrant connection error: %v", err)
 	}
@@ -135,7 +136,7 @@ func ensureQdrantCollection() error {
 		req.Header.Set("api-key", qdrantAPIKey)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := qdrantClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to create qdrant collection: %v", err)
 	}
@@ -239,7 +240,7 @@ func qdrantCountByDocID(docID string) (int, error) {
 		req.Header.Set("api-key", qdrantAPIKey)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := qdrantClient.Do(req)
 	if err != nil {
 		return 0, err
 	}

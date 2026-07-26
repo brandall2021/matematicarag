@@ -235,15 +235,22 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 
 	docURL := fmt.Sprintf("/documents?id=%s", docID)
 
+	allOK := true
 	for i, chunk := range chunks {
 		chunkID := fmt.Sprintf("%s_%d", docID, i)
 		if err := qdrantUpsert(docID, i, chunkID, embeddings[i], chunk.Text, originalName, chunk.Page, chunk.Section, docURL); err != nil {
 			log.Printf("[DOCS] qdrant upsert error for %s chunk %d: %v", docID, i, err)
+			allOK = false
 		}
 	}
 
-	db.Exec(ctx, `UPDATE documents SET status = 'indexed' WHERE id = $1`, docID)
-	log.Printf("[DOCS] document %s indexed successfully (%d chunks)", docID, len(chunks))
+	if allOK {
+		db.Exec(ctx, `UPDATE documents SET status = 'indexed' WHERE id = $1`, docID)
+		log.Printf("[DOCS] document %s indexed successfully (%d chunks)", docID, len(chunks))
+	} else {
+		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
+		log.Printf("[DOCS] document %s indexing failed (some upserts failed)", docID)
+	}
 }
 
 func extractTextWithMetadata(filePath, ext string) ([]PageContent, error) {
