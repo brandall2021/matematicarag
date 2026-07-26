@@ -34,6 +34,10 @@ import { MatButtonModule } from '@angular/material/button';
         </form>
         <p class="switch-text">No tenes cuenta? <a routerLink="/register">Registrate</a></p>
       </div>
+      <div class="auth-footer">
+        <a href="https://softgroup.com.ar" target="_blank" rel="noopener">softgroup.com.ar</a>
+        &copy; 2026
+      </div>
     </div>
   `,
   styles: [`
@@ -45,6 +49,9 @@ import { MatButtonModule } from '@angular/material/button';
     .error-message { color: #f44336; text-align: center; margin-bottom: 1rem; }
     .switch-text { color: var(--text-secondary); text-align: center; margin-top: 1rem; }
     a { color: var(--accent); }
+    .auth-footer { margin-top: 1.5rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary); }
+    .auth-footer a { color: var(--text-secondary); text-decoration: none; }
+    .auth-footer a:hover { color: var(--accent); }
   `]
 })
 export class LoginComponent {

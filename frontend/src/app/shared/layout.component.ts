@@ -44,6 +44,10 @@ import { MatIconModule } from '@angular/material/icon';
             </button>
           </div>
         </div>
+        <div class="sidebar-copyright">
+          <a href="https://softgroup.com.ar" target="_blank" rel="noopener">softgroup.com.ar</a>
+          &copy; 2026
+        </div>
       </div>
       <div class="content">
         <router-outlet />
@@ -69,6 +73,9 @@ import { MatIconModule } from '@angular/material/icon';
     .footer-actions button { width: 32px; height: 32px; }
     .footer-actions button mat-icon { font-size: 18px; width: 18px; height: 18px; color: var(--text-secondary); }
     .theme-btn:hover mat-icon, .footer-actions button:hover mat-icon { color: var(--accent); }
+    .sidebar-copyright { padding: 0.6rem 1rem; border-top: 1px solid var(--border); text-align: center; font-size: 0.7rem; color: var(--text-secondary); }
+    .sidebar-copyright a { color: var(--text-secondary); text-decoration: none; }
+    .sidebar-copyright a:hover { color: var(--accent); }
     .content { flex: 1; overflow-y: auto; }
 
     @media (max-width: 1023px) {
