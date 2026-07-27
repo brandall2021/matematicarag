@@ -14,6 +14,7 @@ export const routes: Routes = [
       { path: '', redirectTo: 'chat', pathMatch: 'full' },
       { path: 'chat', loadComponent: () => import('./modules/chat/chat.component').then(m => m.ChatComponent) },
       { path: 'math', loadComponent: () => import('./modules/math/math.component').then(m => m.MathComponent) },
+      { path: 'tutor', loadComponent: () => import('./modules/tutor/tutor.component').then(m => m.TutorComponent) },
       { path: 'documents', loadComponent: () => import('./modules/documents/documents.component').then(m => m.DocumentsComponent) },
       { path: 'bdvectorial', loadComponent: () => import('./modules/bdvectorial/bdvectorial.component').then(m => m.BdvectorialComponent) },
       { path: 'history', loadComponent: () => import('./modules/history/history.component').then(m => m.HistoryComponent) },
