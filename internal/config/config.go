@@ -27,6 +27,9 @@ type Config struct {
 	EnableHybrid    bool
 	EnableReranker  bool
 	EnableCitations bool
+	// Math Service
+	MathServiceURL string
+	MathTimeout    int
 }
 
 func Load() *Config {
@@ -51,6 +54,9 @@ func Load() *Config {
 		EnableHybrid:    getEnvBool("ENABLE_HYBRID_SEARCH", true),
 		EnableReranker:  getEnvBool("ENABLE_RERANKER", true),
 		EnableCitations: getEnvBool("ENABLE_CITATIONS", true),
+		// Math Service
+		MathServiceURL: getEnv("MATH_SERVICE_URL", "http://localhost:5000"),
+		MathTimeout:    getEnvInt("MATH_TIMEOUT", 5),
 	}
 }
 
