@@ -291,6 +291,58 @@ func Migrate(db *pgxpool.Pool) error {
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_recommendations_student ON learning_recommendations(student_id)`,
+
+		// Seed: Math I concept tree
+		`INSERT INTO concepts (id, name, description, parent_id, course_id, difficulty_base) VALUES
+		 ('algebra', 'Álgebra', 'Operaciones algebraicas y ecuaciones', NULL, 'matematica-1', 1),
+		 ('algebra.operaciones', 'Operaciones algebraicas', 'Suma, resta, multiplicación, división de polinomios', 'algebra', 'matematica-1', 1),
+		 ('algebra.factorizacion', 'Factorización', 'Factor común, diferencia de cuadrados, trinomio cuadrado', 'algebra', 'matematica-1', 2),
+		 ('algebra.ecuaciones', 'Ecuaciones', 'Ecuaciones lineales y cuadráticas', 'algebra', 'matematica-1', 2),
+		 ('funciones', 'Funciones', 'Concepto de función, dominio, imagen', NULL, 'matematica-1', 1),
+		 ('funciones.lineal', 'Función lineal', 'f(x) = mx + b, pendiente, intersección', 'funciones', 'matematica-1', 1),
+		 ('funciones.cuadratica', 'Función cuadrática', 'f(x) = ax² + bx + c, vértice, raíces', 'funciones', 'matematica-1', 2),
+		 ('funciones.composicion', 'Composición de funciones', 'f(g(x)), función compuesta', 'funciones', 'matematica-1', 3),
+		 ('limites', 'Límites', 'Concepto y cálculo de límites', NULL, 'matematica-1', 2),
+		 ('limites.concepto', 'Concepto de límite', 'Definición intuitiva y formal', 'limites', 'matematica-1', 2),
+		 ('limites.propiedades', 'Propiedades de límites', 'Propiedades algebraicas', 'limites', 'matematica-1', 3),
+		 ('limites.laterales', 'Límites laterales', 'Límite por la izquierda y derecha', 'limites', 'matematica-1', 3),
+		 ('derivadas', 'Derivadas', 'Cálculo diferencial', NULL, 'matematica-1', 3),
+		 ('derivadas.definicion', 'Definición de derivada', 'Límite de la razón de incremento', 'derivadas', 'matematica-1', 3),
+		 ('derivadas.potencia', 'Regla de la potencia', 'd/dx(x^n) = n·x^(n-1)', 'derivadas', 'matematica-1', 3),
+		 ('derivadas.producto', 'Regla del producto', 'd/dx(f·g) = f''·g + f·g''', 'derivadas', 'matematica-1', 4),
+		 ('derivadas.cociente', 'Regla del cociente', 'd/dx(f/g) = (f''·g - f·g'') / g²', 'derivadas', 'matematica-1', 4),
+		 ('derivadas.cadena', 'Regla de la cadena', 'd/dx(f(g(x))) = f''(g(x))·g''(x)', 'derivadas', 'matematica-1', 4),
+		 ('integrales', 'Integrales', 'Cálculo integral', NULL, 'matematica-1', 4),
+		 ('integrales.indefinida', 'Integral indefinida', 'Antiderivada, familia de funciones', 'integrales', 'matematica-1', 4),
+		 ('integrales.definida', 'Integral definida', 'Área bajo la curva, teorema fundamental', 'integrales', 'matematica-1', 4),
+		 ('integrales.sustitucion', 'Sustitución', 'Cambio de variable', 'integrales', 'matematica-1', 5),
+		 ('integrales.partes', 'Integración por partes', '∫u·dv = u·v - ∫v·du', 'integrales', 'matematica-1', 5)
+		 ON CONFLICT (id) DO NOTHING`,
+
+		// Seed: Prerequisites
+		`INSERT INTO concept_prerequisites (concept_id, prerequisite_id) VALUES
+		 ('algebra.operaciones', 'algebra'),
+		 ('algebra.factorizacion', 'algebra.operaciones'),
+		 ('algebra.ecuaciones', 'algebra.operaciones'),
+		 ('funciones.lineal', 'funciones'),
+		 ('funciones.cuadratica', 'funciones.lineal'),
+		 ('funciones.composicion', 'funciones.cuadratica'),
+		 ('limites.concepto', 'funciones'),
+		 ('limites.propiedades', 'limites.concepto'),
+		 ('limites.laterales', 'limites.propiedades'),
+		 ('derivadas.definicion', 'limites.concepto'),
+		 ('derivadas.potencia', 'derivadas.definicion'),
+		 ('derivadas.producto', 'derivadas.potencia'),
+		 ('derivadas.cociente', 'derivadas.producto'),
+		 ('derivadas.cadena', 'derivadas.potencia'),
+		 ('derivadas.cadena', 'funciones.composicion'),
+		 ('integrales.indefinida', 'derivadas.potencia'),
+		 ('integrales.definida', 'integrales.indefinida'),
+		 ('integrales.definida', 'limites.concepto'),
+		 ('integrales.sustitucion', 'integrales.indefinida'),
+		 ('integrales.partes', 'integrales.indefinida'),
+		 ('integrales.partes', 'derivadas.producto')
+		 ON CONFLICT DO NOTHING`,
 	}
 
 	for _, m := range migrations {
