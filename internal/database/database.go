@@ -101,6 +101,37 @@ func Migrate(db *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_usage_logs_user ON usage_logs(user_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_usage_logs_created ON usage_logs(created_at)`,
+		`CREATE TABLE IF NOT EXISTS document_chunks (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+			chunk_index INTEGER NOT NULL,
+			content TEXT NOT NULL,
+			page INTEGER DEFAULT 0,
+			section TEXT DEFAULT '',
+			topic TEXT DEFAULT '',
+			content_type TEXT DEFAULT 'theory',
+			has_formula BOOLEAN DEFAULT false,
+			has_example BOOLEAN DEFAULT false,
+			has_exercise BOOLEAN DEFAULT false,
+			has_solution BOOLEAN DEFAULT false,
+			course_id TEXT DEFAULT '',
+			unit_id TEXT DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_document_chunks_doc ON document_chunks(document_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_document_chunks_content_type ON document_chunks(content_type)`,
+		`CREATE INDEX IF NOT EXISTS idx_document_chunks_course ON document_chunks(course_id)`,
+		`ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS content_tsv tsvector`,
+		`CREATE INDEX IF NOT EXISTS idx_document_chunks_tsv ON document_chunks USING gin(content_tsv)`,
+		`CREATE OR REPLACE FUNCTION document_chunks_tsv_trigger() RETURNS trigger AS $$
+		BEGIN
+			NEW.content_tsv := to_tsvector('spanish', COALESCE(NEW.content, ''));
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql`,
+		`DROP TRIGGER IF EXISTS tsvector_update ON document_chunks`,
+		`CREATE TRIGGER tsvector_update BEFORE INSERT OR UPDATE ON document_chunks
+			FOR EACH ROW EXECUTE FUNCTION document_chunks_tsv_trigger()`,
 	}
 
 	for _, m := range migrations {

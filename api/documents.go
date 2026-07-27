@@ -60,9 +60,15 @@ type PageContent struct {
 }
 
 type ChunkMeta struct {
-	Text    string
-	Page    int
-	Section string
+	Text        string
+	Page        int
+	Section     string
+	Topic       string
+	ContentType string
+	HasFormula  bool
+	HasExample  bool
+	HasExercise bool
+	HasSolution bool
 }
 
 var uploadDir = "./uploads"
@@ -189,6 +195,7 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 				return
 			}
+			db.Exec(r.Context(), `DELETE FROM document_chunks WHERE document_id = $1`, docID)
 			qdrantDeleteByDocID(docID)
 			db.Exec(r.Context(), `DELETE FROM documents WHERE id = $1`, docID)
 			os.Remove(filepath.Join(uploadDir, filename))
@@ -213,6 +220,18 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 		log.Printf("[DOCS] no chunks for %s", docID)
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		return
+	}
+
+	// Insert chunks into document_chunks for text search
+	for i, chunk := range chunks {
+		_, err := db.Exec(ctx,
+			`INSERT INTO document_chunks (document_id, chunk_index, content, page, section, topic, content_type, has_formula, has_example, has_exercise, has_solution)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			docID, i, chunk.Text, chunk.Page, chunk.Section, chunk.Topic, chunk.ContentType, chunk.HasFormula, chunk.HasExample, chunk.HasExercise, chunk.HasSolution,
+		)
+		if err != nil {
+			log.Printf("[DOCS] chunk insert error for %s chunk %d: %v", docID, i, err)
+		}
 	}
 
 	if err := ensureQdrantCollection(); err != nil {
@@ -348,6 +367,41 @@ func detectSection(line string) string {
 	return ""
 }
 
+func detectContentType(text string) string {
+	lower := strings.ToLower(text)
+	if matched, _ := regexp.MatchString(`(?i)(definicion|definición|define|se define)`, lower); matched {
+		return "definition"
+	}
+	if matched, _ := regexp.MatchString(`(?i)(teorema|theorem|se demuestra|demostracion)`, lower); matched {
+		return "theorem"
+	}
+	if matched, _ := regexp.MatchString(`(?i)(fórmula|formula|expresion|ecuacion|ecuación)`, lower); matched {
+		return "formula"
+	}
+	if matched, _ := regexp.MatchString(`(?i)(ejemplo|ej\.|ej1|ej2|ejercicio resuelto)`, lower); matched {
+		return "example"
+	}
+	if matched, _ := regexp.MatchString(`(?i)(ejercicio|resolver|calcular|determinar|hallar)`, lower); matched {
+		return "exercise"
+	}
+	if matched, _ := regexp.MatchString(`(?i)(solucion|solución|resultado|respuesta)`, lower); matched {
+		return "solution"
+	}
+	if matched, _ := regexp.MatchString(`(?i)(resumen|conclusion|conclusión)`, lower); matched {
+		return "summary"
+	}
+	return "theory"
+}
+
+func detectContentFlags(text string) (hasFormula, hasExample, hasExercise, hasSolution bool) {
+	lower := strings.ToLower(text)
+	hasFormula, _ = regexp.MatchString(`(?i)(fórmula|formula|=|\\frac|\\int|\\sum|\$\$)`, lower)
+	hasExample, _ = regexp.MatchString(`(?i)(ejemplo|ej\.|ej1|ej2)`, lower)
+	hasExercise, _ = regexp.MatchString(`(?i)(ejercicio|resolver|calcular|determinar|hallar)`, lower)
+	hasSolution, _ = regexp.MatchString(`(?i)(solucion|solución|resultado|respuesta)`, lower)
+	return
+}
+
 func chunkTextWithMetadata(pages []PageContent, chunkSize, overlap int) []ChunkMeta {
 	var allChunks []ChunkMeta
 	currentSection := ""
@@ -373,10 +427,16 @@ func chunkTextWithMetadata(pages []PageContent, chunkSize, overlap int) []ChunkM
 			}
 			chunk := strings.TrimSpace(string(runes[i:end]))
 			if len(chunk) > 20 {
+				hasFormula, hasExample, hasExercise, hasSolution := detectContentFlags(chunk)
 				allChunks = append(allChunks, ChunkMeta{
-					Text:    chunk,
-					Page:    page.Page,
-					Section: currentSection,
+					Text:        chunk,
+					Page:        page.Page,
+					Section:     currentSection,
+					ContentType: detectContentType(chunk),
+					HasFormula:  hasFormula,
+					HasExample:  hasExample,
+					HasExercise: hasExercise,
+					HasSolution: hasSolution,
 				})
 			}
 			if end >= len(runes) {
