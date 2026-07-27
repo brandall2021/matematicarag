@@ -56,7 +56,8 @@ func main() {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
 			r.Route("/history", api.HistoryRoutes(db))
 			r.Route("/users", api.UserRoutes(db))
-			r.Route("/learning", api.LearningRoutes(db, cfg))
+			r.Route("/learning", api.LearningRoutes(db))
+			r.Route("/concepts", api.KnowledgeRoutes(db))
 		})
 
 		r.Group(func(r chi.Router) {

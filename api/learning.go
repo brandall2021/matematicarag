@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/brandall2021/matematicarag/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -44,9 +43,8 @@ type StudentError struct {
 	LastOccurredAt string `json:"last_occurred_at"`
 }
 
-func LearningRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
+func LearningRoutes(db *pgxpool.Pool) func(r chi.Router) {
 	return func(r chi.Router) {
-		r.Use(AuthMiddleware(cfg.JWTSecret))
 
 		r.Get("/progress", func(w http.ResponseWriter, r *http.Request) {
 			studentID := r.Context().Value(UserIDKey).(string)

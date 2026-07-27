@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { environment } from '../../../environments/environment';
 
 interface Doc {
@@ -29,7 +30,7 @@ interface Chunk {
 @Component({
   selector: 'app-bdvectorial',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, MatButtonModule, MatIconModule, MatTooltipModule],
   template: `
     <div class="container">
       <h1><mat-icon>database</mat-icon> Base Vectorial (Qdrant)</h1>
@@ -42,6 +43,18 @@ interface Chunk {
       @if (error()) {
         <div class="msg error">{{ error() }}</div>
       }
+
+      @if (reindexMsg()) {
+        <div class="msg" [class.success]="reindexOk()" [class.error]="!reindexOk()">{{ reindexMsg() }}</div>
+      }
+
+      <div class="actions-bar">
+        <button mat-raised-button color="warn" (click)="reindexAll()" [disabled]="reindexingAll() || docs().length === 0">
+          <mat-icon>{{ reindexingAll() ? 'sync' : 'refresh' }}</mat-icon>
+          {{ reindexingAll() ? 'Reindexando...' : 'Reindexar todo' }}
+        </button>
+        <span class="doc-count">{{ docs().length }} documentos</span>
+      </div>
 
       <div class="doc-list">
         @for (doc of docs(); track doc.id) {
@@ -71,6 +84,9 @@ interface Chunk {
                   }
                 </div>
               </div>
+              <button mat-icon-button class="reindex-btn" (click)="reindexDoc(doc, $event)" [disabled]="reindexingDoc() === doc.id" matTooltip="Reindexar">
+                <mat-icon [class.spin]="reindexingDoc() === doc.id">{{ reindexingDoc() === doc.id ? 'sync' : 'refresh' }}</mat-icon>
+              </button>
               <mat-icon class="expand-icon">{{ expandedDoc() === doc.id ? 'expand_less' : 'expand_more' }}</mat-icon>
             </div>
 
@@ -127,6 +143,12 @@ interface Chunk {
     .loading { display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); padding: 2rem; justify-content: center; }
     .msg { padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1rem; }
     .msg.error { background: #dc262620; color: #dc2626; border: 1px solid #dc262640; }
+    .msg.success { background: #16a34a20; color: #16a34a; border: 1px solid #16a34a40; }
+    .actions-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .actions-bar button { display: flex; align-items: center; gap: 0.4rem; }
+    .doc-count { font-size: 0.85rem; color: var(--text-secondary); }
+    .reindex-btn { color: var(--text-secondary) !important; }
+    .reindex-btn:hover { color: var(--accent) !important; }
     .doc-list { display: flex; flex-direction: column; gap: 0.75rem; }
     .doc-card { background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; transition: border-color 0.2s; }
     .doc-card.expanded { border-color: var(--accent); }
@@ -167,6 +189,10 @@ export class BdvectorialComponent {
   loading = signal(false);
   loadingChunks = signal(false);
   error = signal('');
+  reindexingDoc = signal<string | null>(null);
+  reindexingAll = signal(false);
+  reindexMsg = signal('');
+  reindexOk = signal(false);
 
   constructor(private http: HttpClient) {
     this.loadDocs();
@@ -220,5 +246,42 @@ export class BdvectorialComponent {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  reindexDoc(doc: Doc, event: Event) {
+    event.stopPropagation();
+    this.reindexingDoc.set(doc.id);
+    this.reindexMsg.set('');
+    this.http.post<any>(`${environment.apiUrl}/api/indexer/reindex`, { document_id: doc.id }).subscribe({
+      next: () => {
+        this.reindexMsg.set(`Reindexación iniciada para "${doc.originalName}". Los chunks se actualizarán en segundo plano.`);
+        this.reindexOk.set(true);
+        this.reindexingDoc.set(null);
+        setTimeout(() => this.loadDocs(), 3000);
+      },
+      error: (err) => {
+        this.reindexMsg.set(err.error?.error || 'Error al reindexar documento');
+        this.reindexOk.set(false);
+        this.reindexingDoc.set(null);
+      }
+    });
+  }
+
+  reindexAll() {
+    this.reindexingAll.set(true);
+    this.reindexMsg.set('');
+    this.http.post<any>(`${environment.apiUrl}/api/indexer/reindex`, {}).subscribe({
+      next: () => {
+        this.reindexMsg.set('Reindexación completa iniciada. Todos los documentos se están procesando en segundo plano.');
+        this.reindexOk.set(true);
+        this.reindexingAll.set(false);
+        setTimeout(() => this.loadDocs(), 5000);
+      },
+      error: (err) => {
+        this.reindexMsg.set(err.error?.error || 'Error al reindexar documentos');
+        this.reindexOk.set(false);
+        this.reindexingAll.set(false);
+      }
+    });
   }
 }
