@@ -14,7 +14,7 @@ import (
 
 var (
 	qdrantURL    = "http://sistemas-qdrant-gjlncs-qdrant-1:6333"
-	qdrantAPIKey = "0ylktnefcidr4f6dvkmwfoxc4nrgtywh"
+	qdrantAPIKey = ""
 	collection   = "matematica_chunks"
 	qdrantClient = &http.Client{Timeout: 30 * time.Second}
 )

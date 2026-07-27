@@ -475,7 +475,7 @@ func generateEmbeddings(db *pgxpool.Pool, texts []string) ([][]float32, error) {
 	if apiKey == "" {
 		return nil, fmt.Errorf("no API key for embeddings")
 	}
-	log.Printf("[EMBED] using key: %s... (len=%d)", apiKey[:min(len(apiKey), 8)], len(apiKey))
+	log.Printf("[EMBED] using key: ***... (len=%d)", len(apiKey))
 
 	reqBody := map[string]interface{}{
 		"model": "text-embedding-3-small",

@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -52,6 +53,10 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			if req.Content == "" {
 				http.Error(w, `{"error":"content is required"}`, http.StatusBadRequest)
+				return
+			}
+			if len(req.Content) > 50000 {
+				http.Error(w, `{"error":"content too long (max 50000 characters)"}`, http.StatusBadRequest)
 				return
 			}
 			if req.SessionID == "" {
@@ -124,7 +129,8 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			response, callErr := callOpenAIWithHistory(db, messages, model)
 
 			if callErr != nil {
-				http.Error(w, `{"error":"`+callErr.Error()+`"}`, http.StatusBadGateway)
+				log.Printf("[CHAT] OpenAI error: %v", callErr)
+				http.Error(w, `{"error":"error al generar respuesta. Intenta de nuevo."}`, http.StatusBadGateway)
 				return
 			}
 

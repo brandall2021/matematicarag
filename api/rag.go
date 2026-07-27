@@ -89,8 +89,15 @@ func RagRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				http.Error(w, `{"error":"query is required"}`, http.StatusBadRequest)
 				return
 			}
+			if len(req.Query) > 10000 {
+				http.Error(w, `{"error":"query too long (max 10000 characters)"}`, http.StatusBadRequest)
+				return
+			}
 			if req.TopK == 0 {
 				req.TopK = cfg.RerankTopK
+			}
+			if req.TopK > 50 {
+				req.TopK = 50
 			}
 
 			// Build filters
@@ -116,7 +123,7 @@ func RagRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				log.Printf("[RAG] hybrid search error: %v", err)
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(RagQueryResponse{
-					Answer:     "Error en la busqueda: " + err.Error(),
+					Answer:     "Error interno en la busqueda. Intenta con una consulta mas corta.",
 					Citations:  []RagCitation{},
 					Confidence: "low",
 				})
