@@ -90,7 +90,7 @@ func RagRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				return
 			}
 			if req.TopK == 0 {
-				req.TopK = 5
+				req.TopK = cfg.RerankTopK
 			}
 
 			// Build filters
@@ -109,8 +109,8 @@ func RagRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 
 			// 1. Hybrid search
-			vectorWeight := 0.60
-			keywordWeight := 0.40
+			vectorWeight := cfg.VectorWeight
+			keywordWeight := cfg.KeywordWeight
 			hybridResults, err := HybridSearch(db, req.Query, req.TopK*4, filters, vectorWeight, keywordWeight)
 			if err != nil {
 				log.Printf("[RAG] hybrid search error: %v", err)

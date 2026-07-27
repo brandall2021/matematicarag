@@ -16,6 +16,17 @@ type Config struct {
 	CORSOrigins     string
 	EmbeddingType   string
 	Environment     string
+	// RAG Configuration
+	ChunkSize       int
+	ChunkOverlap    int
+	VectorWeight    float64
+	KeywordWeight   float64
+	RetrievalTopK   int
+	RerankTopK      int
+	RAGMinScore     float64
+	EnableHybrid    bool
+	EnableReranker  bool
+	EnableCitations bool
 }
 
 func Load() *Config {
@@ -29,7 +40,45 @@ func Load() *Config {
 		CORSOrigins:   getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:4200"),
 		EmbeddingType: getEnv("EMBEDDING_TYPE", "openai"),
 		Environment:   getEnv("APP_ENV", "development"),
+		// RAG defaults
+		ChunkSize:       getEnvInt("CHUNK_SIZE", 500),
+		ChunkOverlap:    getEnvInt("CHUNK_OVERLAP", 50),
+		VectorWeight:    getEnvFloat("VECTOR_WEIGHT", 0.60),
+		KeywordWeight:   getEnvFloat("KEYWORD_WEIGHT", 0.40),
+		RetrievalTopK:   getEnvInt("RETRIEVAL_TOP_K", 20),
+		RerankTopK:      getEnvInt("RERANK_TOP_K", 5),
+		RAGMinScore:     getEnvFloat("RAG_MIN_SCORE", 0.70),
+		EnableHybrid:    getEnvBool("ENABLE_HYBRID_SEARCH", true),
+		EnableReranker:  getEnvBool("ENABLE_RERANKER", true),
+		EnableCitations: getEnvBool("ENABLE_CITATIONS", true),
 	}
+}
+
+func getEnvInt(key string, defaultVal int) int {
+	if v := os.Getenv(key); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil {
+			return n
+		}
+	}
+	return defaultVal
+}
+
+func getEnvFloat(key string, defaultVal float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		var f float64
+		if _, err := fmt.Sscanf(v, "%f", &f); err == nil {
+			return f
+		}
+	}
+	return defaultVal
+}
+
+func getEnvBool(key string, defaultVal bool) bool {
+	if v := os.Getenv(key); v != "" {
+		return v == "true" || v == "1" || v == "yes"
+	}
+	return defaultVal
 }
 
 func getEnv(key, defaultVal string) string {

@@ -215,7 +215,15 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 		return
 	}
 
-	chunks := chunkTextWithMetadata(pages, 500, 50)
+	chunkSize := 500
+	overlap := 50
+	if v := getSetting(db, "CHUNK_SIZE"); v != "" {
+		fmt.Sscanf(v, "%d", &chunkSize)
+	}
+	if v := getSetting(db, "CHUNK_OVERLAP"); v != "" {
+		fmt.Sscanf(v, "%d", &overlap)
+	}
+	chunks := chunkTextWithMetadata(pages, chunkSize, overlap)
 	if len(chunks) == 0 {
 		log.Printf("[DOCS] no chunks for %s", docID)
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
