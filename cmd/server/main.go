@@ -68,6 +68,12 @@ func main() {
 			r.Route("/settings", api.SettingsRoutes(db))
 			r.Route("/stats", api.StatsRoutes(db))
 		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(api.AuthMiddleware(cfg.JWTSecret))
+			r.Use(api.RoleMiddleware("TEACHER", "ADMIN"))
+			r.Route("/teacher", api.TeacherRoutes(db))
+		})
 	})
 
 	apiRouter.Get("/health", func(w http.ResponseWriter, r *http.Request) {
