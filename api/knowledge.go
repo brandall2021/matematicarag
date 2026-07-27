@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/brandall2021/matematicarag/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -25,13 +24,11 @@ type PrereqInfo struct {
 	Prerequisites []string `json:"prerequisites"`
 }
 
-func KnowledgeRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
+func KnowledgeRoutes(db *pgxpool.Pool) func(r chi.Router) {
 	return func(r chi.Router) {
-		r.Use(AuthMiddleware(cfg.JWTSecret))
-
 		r.Get("/courses/{courseID}/concepts", func(w http.ResponseWriter, r *http.Request) {
 			courseID := chi.URLParam(r, "courseID")
-			tree, err := GetConceptTree(db, courseID)
+			tree, err := GetConceptTree(r.Context(), db, courseID)
 			if err != nil {
 				http.Error(w, `{"error":"failed to load concept tree"}`, http.StatusInternalServerError)
 				return
@@ -68,8 +65,8 @@ func KnowledgeRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	}
 }
 
-func GetConceptTree(db *pgxpool.Pool, courseID string) ([]ConceptNode, error) {
-	rows, err := db.Query(context.Background(),
+func GetConceptTree(ctx context.Context, db *pgxpool.Pool, courseID string) ([]ConceptNode, error) {
+	rows, err := db.Query(ctx,
 		`SELECT id, name, description, parent_id, course_id, difficulty_base
 		 FROM concepts WHERE course_id = $1 ORDER BY id`, courseID)
 	if err != nil {
@@ -77,7 +74,7 @@ func GetConceptTree(db *pgxpool.Pool, courseID string) ([]ConceptNode, error) {
 	}
 	defer rows.Close()
 
-	var all []ConceptNode
+	all := []ConceptNode{}
 	for rows.Next() {
 		var n ConceptNode
 		if err := rows.Scan(&n.ID, &n.Name, &n.Description, &n.ParentID, &n.CourseID, &n.DifficultyBase); err != nil {
@@ -87,7 +84,7 @@ func GetConceptTree(db *pgxpool.Pool, courseID string) ([]ConceptNode, error) {
 	}
 
 	byParent := make(map[string][]ConceptNode)
-	var roots []ConceptNode
+	roots := []ConceptNode{}
 	for _, n := range all {
 		if n.ParentID == nil {
 			roots = append(roots, n)
@@ -118,7 +115,7 @@ func GetPrerequisites(db *pgxpool.Pool, conceptID string) ([]string, error) {
 	}
 	defer rows.Close()
 
-	var prereqs []string
+	prereqs := []string{}
 	for rows.Next() {
 		var p string
 		if err := rows.Scan(&p); err != nil {
