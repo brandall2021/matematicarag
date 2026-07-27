@@ -38,7 +38,7 @@ interface ChatMsg {
                 <div class="sources">
                   <span class="sources-label"><mat-icon>menu_book</mat-icon> Fuentes:</span>
                   @for (src of msg.sources; track src.id) {
-                    <button class="source-chip" (click)="openSource(src)">
+                    <button class="source-chip" [class.expanded]="expandedCitation === src.id" (click)="toggleCitation(src.id)">
                       <mat-icon class="source-icon">description</mat-icon>
                       {{ src.filename }}
                       @if (src.page) {
@@ -50,6 +50,29 @@ interface ChatMsg {
                     </button>
                   }
                 </div>
+                @if (expandedCitation) {
+                  <div class="citation-detail">
+                    @for (src of msg.sources; track src.id) {
+                      @if (expandedCitation === src.id) {
+                        <div class="citation-card">
+                          <div class="citation-card-header">
+                            <strong>{{ src.id }}</strong> — {{ src.filename }}
+                            @if (src.section) {
+                              <span> / {{ src.section }}</span>
+                            }
+                            @if (src.page) {
+                              <span> (página {{ src.page }})</span>
+                            }
+                            <span class="citation-score" [style.color]="getSourceColor(src.score)">
+                              {{ (src.score * 100).toFixed(0) }}%
+                            </span>
+                          </div>
+                          <div class="citation-card-content">{{ src.content }}</div>
+                        </div>
+                      }
+                    }
+                  </div>
+                }
               }
             </div>
           }
@@ -78,8 +101,14 @@ interface ChatMsg {
     .source-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.5rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-size: 0.72rem; cursor: pointer; transition: all 0.15s; }
     .source-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--bg); }
     .source-icon { font-size: 12px; width: 12px; height: 12px; }
+    .source-chip.expanded { background: rgba(200, 170, 118, 0.15); border-color: #c8aa76; color: #c8aa76; }
     .source-page { color: var(--accent); font-weight: 600; }
     .source-section { color: var(--text-secondary); font-style: italic; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .citation-detail { margin-top: 8px; }
+    .citation-card { background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-top: 6px; }
+    .citation-card-header { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; }
+    .citation-score { margin-left: auto; font-weight: 700; font-size: 12px; }
+    .citation-card-content { font-size: 12px; color: var(--text-secondary); line-height: 1.5; font-style: italic; }
     .input-area { padding: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); }
     .chat-input { flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 1rem; outline: none; }
     .chat-input:focus { border-color: var(--accent); }
@@ -89,8 +118,19 @@ export class ChatComponent {
   messages = signal<ChatMsg[]>([]);
   currentSessionId = signal<string>('');
   newMessage = '';
+  expandedCitation: string | null = null;
 
   constructor(private api: ApiService, private router: Router) {}
+
+  toggleCitation(id: string) {
+    this.expandedCitation = this.expandedCitation === id ? null : id;
+  }
+
+  getSourceColor(score: number): string {
+    if (score >= 0.9) return '#4caf50';
+    if (score >= 0.7) return '#ff9800';
+    return '#9e9e9e';
+  }
 
   sendMessage() {
     if (!this.newMessage) return;
