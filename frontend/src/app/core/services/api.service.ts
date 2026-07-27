@@ -3,6 +3,36 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
+export interface TutorRequest {
+  query: string;
+  course_id?: string;
+  unit_id?: string;
+  explanation_level?: 'basic' | 'intermediate' | 'advanced';
+  mode?: 'solve' | 'verify' | 'hint' | 'explain_error';
+  user_result?: string;
+  user_procedure?: string[];
+}
+
+export interface TutorStep {
+  number: number;
+  title: string;
+  explanation: string;
+  latex?: string;
+  is_math: boolean;
+}
+
+export interface TutorResponse {
+  problem: { type: string; expression: string; variable?: string };
+  method: { name: string; description: string };
+  steps: TutorStep[];
+  result?: { success: boolean; result: string; latex: string };
+  verification?: { status: string; method?: string };
+  citations: any[];
+  sources: any[];
+  math_computed: boolean;
+  confidence: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private baseUrl = environment.apiUrl + '/api';
@@ -57,5 +87,9 @@ export class ApiService {
 
   getAdminStats(): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/stats/admin`);
+  }
+
+  tutorSolve(request: TutorRequest): Observable<TutorResponse> {
+    return this.http.post<TutorResponse>(`${this.baseUrl}/tutor/solve`, request);
   }
 }
