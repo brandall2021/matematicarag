@@ -97,9 +97,9 @@ func ChatRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 				customPrompt = defaultChatPrompt
 			}
 
-			if ragContext != "" {
-				customPrompt += "\n\nTenes acceso a documentos de referencia. Usa la siguiente informacion para responder cuando sea relevante. Cita las fuentes usando el formato: [Fuente: nombre_archivo, pagina X]."
-			}
+		if ragContext != "" {
+			customPrompt += "\n\nTenes acceso a documentos de referencia. Usa la siguiente informacion para responder cuando sea relevante. Cita las fuentes usando el formato: [SRC-XXX] donde XXX es el numero de fuente. No inventes fuentes."
+		}
 
 			var messages []OpenAIMessage
 			if ragContext != "" {
@@ -225,20 +225,31 @@ func truncate(s string, n int) string {
 }
 
 func performRAGSearch(db *pgxpool.Pool, query string) ([]RagSource, string) {
-	results, err := VectorSearch(db, query, 5)
-	if err != nil || len(results) == 0 {
+	// Use hybrid search
+	hybridResults, err := HybridSearch(db, query, 20, nil, 0.60, 0.40)
+	if err != nil || len(hybridResults) == 0 {
 		return nil, ""
 	}
 
+	// Rerank to get top 5
+	reranked, err := RerankResults(db, query, hybridResults, 5)
+	if err != nil {
+		reranked = hybridResults
+		if len(reranked) > 5 {
+			reranked = reranked[:5]
+		}
+	}
+
 	var contextParts []string
-	sources := make([]RagSource, len(results))
-	for i, res := range results {
+	sources := make([]RagSource, len(reranked))
+	for i, res := range reranked {
 		sourceLabel := buildSourceLabel(res.Filename, res.Page, res.Section)
-		contextParts = append(contextParts, fmt.Sprintf("[Fuente: %s]\n%s", sourceLabel, res.Content))
+		citationID := fmt.Sprintf("SRC-%03d", i+1)
+		contextParts = append(contextParts, fmt.Sprintf("[%s] %s\n%s", citationID, sourceLabel, res.Content))
 		sources[i] = RagSource{
 			ID:       res.ChunkID,
 			Content:  truncateString(res.Content, 300),
-			Score:    res.Score,
+			Score:    res.RerankScore,
 			Filename: res.Filename,
 			Page:     res.Page,
 			Section:  res.Section,
