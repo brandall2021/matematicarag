@@ -132,6 +132,165 @@ func Migrate(db *pgxpool.Pool) error {
 		`DROP TRIGGER IF EXISTS tsvector_update ON document_chunks`,
 		`CREATE TRIGGER tsvector_update BEFORE INSERT OR UPDATE ON document_chunks
 			FOR EACH ROW EXECUTE FUNCTION document_chunks_tsv_trigger()`,
+
+		// Knowledge Model
+		`CREATE TABLE IF NOT EXISTS concepts (
+			id VARCHAR(100) PRIMARY KEY,
+			name VARCHAR(255) NOT NULL,
+			description TEXT DEFAULT '',
+			parent_id VARCHAR(100) REFERENCES concepts(id),
+			course_id VARCHAR(100) NOT NULL DEFAULT 'matematica-1',
+			difficulty_base INTEGER DEFAULT 1 CHECK (difficulty_base BETWEEN 1 AND 5),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS concept_prerequisites (
+			concept_id VARCHAR(100) NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+			prerequisite_id VARCHAR(100) NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+			PRIMARY KEY (concept_id, prerequisite_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_concepts_course ON concepts(course_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_concept_prereq ON concept_prerequisites(prerequisite_id)`,
+
+		// Student Learning Profile
+		`CREATE TABLE IF NOT EXISTS student_profiles (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+			course_id VARCHAR(100) NOT NULL DEFAULT 'matematica-1',
+			overall_level REAL DEFAULT 0.0 CHECK (overall_level BETWEEN 0.0 AND 1.0),
+			total_attempts INTEGER DEFAULT 0,
+			correct_attempts INTEGER DEFAULT 0,
+			total_hints_used INTEGER DEFAULT 0,
+			study_time_seconds INTEGER DEFAULT 0,
+			last_active_at TIMESTAMP WITH TIME ZONE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_profiles_student ON student_profiles(student_id)`,
+
+		// Concept Mastery per Student
+		`CREATE TABLE IF NOT EXISTS concept_mastery (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			concept_id VARCHAR(100) NOT NULL REFERENCES concepts(id) ON DELETE CASCADE,
+			mastery REAL DEFAULT 0.0 CHECK (mastery BETWEEN 0.0 AND 1.0),
+			status VARCHAR(20) NOT NULL DEFAULT 'not_started'
+				CHECK (status IN ('not_started','learning','developing','mastered')),
+			attempts INTEGER DEFAULT 0,
+			correct INTEGER DEFAULT 0,
+			hints_used INTEGER DEFAULT 0,
+			error_count INTEGER DEFAULT 0,
+			last_attempt_at TIMESTAMP WITH TIME ZONE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(student_id, concept_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_concept_mastery_student ON concept_mastery(student_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_concept_mastery_concept ON concept_mastery(concept_id)`,
+
+		// Exercise Bank
+		`CREATE TABLE IF NOT EXISTS exercises (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			concept_id VARCHAR(100) NOT NULL REFERENCES concepts(id),
+			difficulty INTEGER NOT NULL CHECK (difficulty BETWEEN 1 AND 5),
+			statement TEXT NOT NULL,
+			latex TEXT DEFAULT '',
+			expected_answer TEXT NOT NULL,
+			solution TEXT DEFAULT '',
+			solution_steps JSONB DEFAULT '[]',
+			hints JSONB DEFAULT '[]',
+			common_errors JSONB DEFAULT '[]',
+			source VARCHAR(20) NOT NULL DEFAULT 'generated'
+				CHECK (source IN ('official','generated')),
+			generated_by VARCHAR(50) DEFAULT '',
+			verified_by_math BOOLEAN DEFAULT false,
+			status VARCHAR(20) NOT NULL DEFAULT 'validated'
+				CHECK (status IN ('pending','validated','rejected')),
+			embedding_id VARCHAR(100) DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_exercises_concept ON exercises(concept_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_exercises_difficulty ON exercises(difficulty)`,
+		`CREATE INDEX IF NOT EXISTS idx_exercises_source ON exercises(source)`,
+
+		// Tutor Sessions
+		`CREATE TABLE IF NOT EXISTS tutor_sessions (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			course_id VARCHAR(100) NOT NULL DEFAULT 'matematica-1',
+			mode VARCHAR(20) NOT NULL DEFAULT 'tutor'
+				CHECK (mode IN ('tutor','practice','review','exam','solve')),
+			concept_id VARCHAR(100) DEFAULT '',
+			started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			ended_at TIMESTAMP WITH TIME ZONE,
+			exercise_count INTEGER DEFAULT 0,
+			correct_count INTEGER DEFAULT 0,
+			hints_used INTEGER DEFAULT 0,
+			total_score REAL DEFAULT 0.0
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_tutor_sessions_student ON tutor_sessions(student_id)`,
+
+		// Exercise Attempts
+		`CREATE TABLE IF NOT EXISTS exercise_attempts (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			session_id UUID NOT NULL REFERENCES tutor_sessions(id) ON DELETE CASCADE,
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			exercise_id UUID NOT NULL REFERENCES exercises(id),
+			started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			completed_at TIMESTAMP WITH TIME ZONE,
+			answer TEXT DEFAULT '',
+			correct BOOLEAN DEFAULT false,
+			score REAL DEFAULT 0.0 CHECK (score BETWEEN 0.0 AND 1.0),
+			hints_used INTEGER DEFAULT 0,
+			max_hints_used INTEGER DEFAULT 0,
+			first_error_step INTEGER DEFAULT 0,
+			time_seconds INTEGER DEFAULT 0,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_exercise_attempts_session ON exercise_attempts(session_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_exercise_attempts_student ON exercise_attempts(student_id)`,
+
+		// Step-by-Step Attempts
+		`CREATE TABLE IF NOT EXISTS attempt_steps (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			attempt_id UUID NOT NULL REFERENCES exercise_attempts(id) ON DELETE CASCADE,
+			step_index INTEGER NOT NULL,
+			content TEXT NOT NULL,
+			status VARCHAR(20) NOT NULL DEFAULT 'pending'
+				CHECK (status IN ('pending','correct','incorrect')),
+			error_type VARCHAR(50) DEFAULT '',
+			error_detail TEXT DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_attempt_steps_attempt ON attempt_steps(attempt_id)`,
+
+		// Error Tracking
+		`CREATE TABLE IF NOT EXISTS student_errors (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			concept_id VARCHAR(100) NOT NULL DEFAULT '',
+			error_type VARCHAR(50) NOT NULL,
+			error_subtype VARCHAR(100) DEFAULT '',
+			count INTEGER DEFAULT 1,
+			severity VARCHAR(20) DEFAULT 'low'
+				CHECK (severity IN ('low','medium','high','critical')),
+			last_occurred_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(student_id, concept_id, error_type, error_subtype)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_errors_student ON student_errors(student_id)`,
+
+		// Learning Recommendations
+		`CREATE TABLE IF NOT EXISTS learning_recommendations (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			recommendation_type VARCHAR(50) NOT NULL,
+			concept_id VARCHAR(100) DEFAULT '',
+			message TEXT NOT NULL,
+			priority INTEGER DEFAULT 1,
+			dismissed BOOLEAN DEFAULT false,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_recommendations_student ON learning_recommendations(student_id)`,
 	}
 
 	for _, m := range migrations {
