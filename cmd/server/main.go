@@ -50,6 +50,7 @@ func main() {
 		r.Route("/documents", api.DocumentRoutes(db, cfg))
 		r.Route("/analytics", api.AnalyticsRoutes(db))
 		r.Route("/indexer", api.IndexerRoutes(db, cfg))
+		r.Route("/tutor", api.TutorRoutes(db, cfg))
 
 		r.Group(func(r chi.Router) {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
