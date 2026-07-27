@@ -17,3 +17,5 @@ frontend/.angular/
 frontend/dist/
 scripts/seed
 matematicarag
+__pycache__/
+.pytest_cache/
