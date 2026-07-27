@@ -30,6 +30,11 @@ type Config struct {
 	// Math Service
 	MathServiceURL string
 	MathTimeout    int
+	// Adaptive Engine
+	AdaptiveHintWeight      float64
+	AdaptiveErrorWeight     float64
+	AdaptiveMasteryThreshold float64
+	AdaptiveMaxDifficulty   int
 }
 
 func Load() *Config {
@@ -57,6 +62,11 @@ func Load() *Config {
 		// Math Service
 		MathServiceURL: getEnv("MATH_SERVICE_URL", "http://localhost:5000"),
 		MathTimeout:    getEnvInt("MATH_TIMEOUT", 5),
+		// Adaptive Engine
+		AdaptiveHintWeight:      getEnvFloat("ADAPTIVE_HINT_WEIGHT", 0.1),
+		AdaptiveErrorWeight:     getEnvFloat("ADAPTIVE_ERROR_WEIGHT", 0.03),
+		AdaptiveMasteryThreshold: getEnvFloat("ADAPTIVE_MASTERY_THRESHOLD", 0.8),
+		AdaptiveMaxDifficulty:   getEnvInt("ADAPTIVE_MAX_DIFFICULTY", 5),
 	}
 }
 
