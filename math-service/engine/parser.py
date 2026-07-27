@@ -4,7 +4,7 @@ from sympy.parsing.latex import parse_latex
 
 def normalize_input(expr_str: str) -> str:
     s = expr_str.strip()
-    s = re.sub(r'^\\$?\\$?|\\$?\\$', '', s)
+    s = re.sub(r'^\${1,2}|\${1,2}$', '', s)
     s = re.sub(r'^\\\\?\\(|\\\\?\\)$', '', s)
     s = re.sub(r'^\\\\?\\[|\\\\?\\]$', '', s)
     superscripts = {'⁰': '**0', '¹': '**1', '²': '**2', '³': '**3',
