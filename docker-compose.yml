@@ -62,8 +62,27 @@ services:
       QDRANT_PORT: "6334"
       EMBEDDING_TYPE: openai
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      MATH_SERVICE_URL: "http://math-service:5000"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    networks:
+      - matematicarag-net
+
+  math-service:
+    build:
+      context: ./math-service
+      dockerfile: Dockerfile
+    container_name: matematicarag-math
+    restart: always
+    environment:
+      MATH_TIMEOUT: "5"
+      MATH_PORT: "5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
