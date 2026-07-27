@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -32,6 +33,9 @@ func init() {
 			fmt.Printf("[QDRANT] Collection init failed: %v\n", err)
 		} else {
 			fmt.Printf("[QDRANT] Collection '%s' ready at %s\n", collection, qdrantURL)
+			if err := ensureQdrantIndices(); err != nil {
+				fmt.Printf("[QDRANT] Index creation failed: %v\n", err)
+			}
 		}
 	}()
 }
@@ -66,6 +70,24 @@ type QdrantCollectionInfo struct {
 	Result struct {
 		Status string `json:"status"`
 	} `json:"result"`
+}
+
+type ChunkPayload struct {
+	DocumentID   string
+	DocumentName string
+	ChunkIndex   int
+	Content      string
+	Page         int
+	Section      string
+	Topic        string
+	ContentType  string
+	HasFormula   bool
+	HasExample   bool
+	HasExercise  bool
+	HasSolution  bool
+	CourseID     string
+	UnitID       string
+	URL          string
 }
 
 func generateChunkID(docID string, chunkIndex int) string {
@@ -155,21 +177,61 @@ func ensureQdrantCollection() error {
 	return nil
 }
 
-func qdrantUpsert(docID string, chunkIndex int, chunkID string, embedding []float32, content string, filename string, page int, section string, url string) error {
+func ensureQdrantIndices() error {
+	indices := []map[string]interface{}{
+		{"field_name": "document_id", "field_schema": "keyword"},
+		{"field_name": "course_id", "field_schema": "keyword"},
+		{"field_name": "unit_id", "field_schema": "keyword"},
+		{"field_name": "topic", "field_schema": "keyword"},
+		{"field_name": "content_type", "field_schema": "keyword"},
+		{"field_name": "page", "field_schema": "integer"},
+	}
+	for _, idx := range indices {
+		_, err := qdrantRequest("PUT", "/collections/"+collection+"/index", idx)
+		if err != nil {
+			log.Printf("[QDRANT] index creation warning for %s: %v", idx["field_name"], err)
+		}
+	}
+	return nil
+}
+
+func qdrantUpsert(docID, chunkID string, chunkIndex int, embedding []float32, meta ChunkPayload) error {
 	payload := map[string]interface{}{
-		"document_id":  docID,
-		"chunk_index":  chunkIndex,
-		"content":      content,
-		"filename":     filename,
+		"document_id":   meta.DocumentID,
+		"document_name": meta.DocumentName,
+		"chunk_index":   meta.ChunkIndex,
+		"content":       meta.Content,
+		"content_type":  meta.ContentType,
 	}
-	if page > 0 {
-		payload["page"] = page
+	if meta.Page > 0 {
+		payload["page"] = meta.Page
 	}
-	if section != "" {
-		payload["section"] = section
+	if meta.Section != "" {
+		payload["section"] = meta.Section
 	}
-	if url != "" {
-		payload["url"] = url
+	if meta.Topic != "" {
+		payload["topic"] = meta.Topic
+	}
+	if meta.CourseID != "" {
+		payload["course_id"] = meta.CourseID
+	}
+	if meta.UnitID != "" {
+		payload["unit_id"] = meta.UnitID
+	}
+	if meta.URL != "" {
+		payload["url"] = meta.URL
+	}
+	if meta.HasFormula {
+		payload["has_formula"] = true
+	}
+	if meta.HasExample {
+		payload["has_example"] = true
+	}
+	if meta.HasExercise {
+		payload["has_exercise"] = true
+	}
+	if meta.HasSolution {
+		payload["has_solution"] = true
 	}
 
 	point := QdrantPoint{
@@ -194,6 +256,45 @@ func qdrantSearch(queryEmbedding []float32, topK int) ([]QdrantSearchResult, err
 	}
 
 	body, err := qdrantRequest("POST", "/collections/"+collection+"/points/search", req)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp QdrantSearchResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, err
+	}
+
+	return resp.Result, nil
+}
+
+func qdrantSearchWithFilters(queryEmbedding []float32, topK int, filters map[string]interface{}) ([]QdrantSearchResult, error) {
+	searchReq := map[string]interface{}{
+		"vector":       queryEmbedding,
+		"top":          topK,
+		"with_payload": true,
+	}
+
+	if len(filters) > 0 {
+		var must []map[string]interface{}
+		for key, value := range filters {
+			if value != nil && value != "" {
+				must = append(must, map[string]interface{}{
+					"key": key,
+					"match": map[string]interface{}{
+						"value": value,
+					},
+				})
+			}
+		}
+		if len(must) > 0 {
+			searchReq["filter"] = map[string]interface{}{
+				"must": must,
+			}
+		}
+	}
+
+	body, err := qdrantRequest("POST", "/collections/"+collection+"/points/search", searchReq)
 	if err != nil {
 		return nil, err
 	}

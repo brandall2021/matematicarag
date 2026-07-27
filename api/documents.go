@@ -257,7 +257,22 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 	allOK := true
 	for i, chunk := range chunks {
 		chunkID := generateChunkID(docID, i)
-		if err := qdrantUpsert(docID, i, chunkID, embeddings[i], chunk.Text, originalName, chunk.Page, chunk.Section, docURL); err != nil {
+		meta := ChunkPayload{
+			DocumentID:   docID,
+			DocumentName: originalName,
+			ChunkIndex:   i,
+			Content:      chunk.Text,
+			Page:         chunk.Page,
+			Section:      chunk.Section,
+			Topic:        chunk.Topic,
+			ContentType:  chunk.ContentType,
+			HasFormula:   chunk.HasFormula,
+			HasExample:   chunk.HasExample,
+			HasExercise:  chunk.HasExercise,
+			HasSolution:  chunk.HasSolution,
+			URL:          docURL,
+		}
+		if err := qdrantUpsert(docID, chunkID, i, embeddings[i], meta); err != nil {
 			log.Printf("[DOCS] qdrant upsert error for %s chunk %d: %v", docID, i, err)
 			allOK = false
 		}
