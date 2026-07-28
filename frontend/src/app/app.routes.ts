@@ -20,6 +20,7 @@ export const routes: Routes = [
       { path: 'history', loadComponent: () => import('./modules/history/history.component').then(m => m.HistoryComponent) },
       { path: 'dashboard', loadComponent: () => import('./modules/dashboard/dashboard.component').then(m => m.DashboardComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'TEACHER'] } },
       { path: 'settings', loadComponent: () => import('./modules/settings/settings.component').then(m => m.SettingsComponent), canActivate: [roleGuard], data: { roles: ['ADMIN'] } },
+      { path: 'assessment', loadComponent: () => import('./modules/assessment/assessment.component').then(m => m.AssessmentComponent) },
       { path: 'my-progress', loadComponent: () => import('./modules/student-progress/student-progress.component').then(m => m.StudentProgressComponent) },
       { path: 'teacher', loadComponent: () => import('./modules/teacher-dashboard/teacher-dashboard.component').then(m => m.TeacherDashboardComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'TEACHER'] } },
     ]
