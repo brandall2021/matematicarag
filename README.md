@@ -1,6 +1,6 @@
 # MatematicaRAG
 
-Tutor de matematicas universitarias con Inteligencia Artificial, RAG (Retrieval-Augmented Generation) y motor matematico symbolic. Resuelve, explica y verifica ejercicios paso a paso con citations academicas.
+Tutor de matematicas universitarias con Inteligencia Artificial, RAG (Retrieval-Augmented Generation), motor matematico symbolic y aprendizaje adaptativo. Resuelve, explica y verifica ejercicios paso a paso con citations academicas, genera ejercicios personalizados, detecta patrones de error y adapta la dificultad al nivel del estudiante.
 
 ## Caracteristicas
 
@@ -20,7 +20,22 @@ Tutor de matematicas universitarias con Inteligencia Artificial, RAG (Retrieval-
 - **Modos de uso**: resolver, verificar, pista, explicar error
 - **Nivel de explicacion**: basico, intermedio, avanzado
 - **Renderizado LaTeX**: formulas con KaTeX en el frontend
-- **Separacion fuentes/calculos**: distingue entre informacion recuperada (📚) y calculos realizados (🧮)
+- **Separacion fuentes/calculos**: distingue entre informacion recuperada (fuentes) y calculos realizados (motor)
+
+### Fase 3 — Tutor Adaptativo
+- **Sesiones adaptativas**: crear sesiones en modos tutor, practica, repaso o examen
+- **Generacion de ejercicios**: LLM genera ejercicios originales validados por SymPy
+- **Correccion paso a paso**: analiza cada paso del procedimiento del alumno
+- **Sistema de pistas**: hasta 3 pistas progresivas por ejercicio
+- **Banco de ejercicios**: repositorio validado por concepto y dificultad
+- **Motor adaptativo**: selecciona siguiente concepto y dificultad basado en mastery del alumno
+- **Grafo de conocimiento**: arbol de conceptos con prerrequisitos (algebra, funciones, limites, derivadas, integrales)
+- **Tracking de mastery**: nivel por concepto (not_started, learning, developing, mastered)
+- **Taxonomia de errores**: clasificacion en 10 categorias (conceptual, algebraico, aritmetico, signo, formula, metodo, notacion, dominio, logico, incompleto)
+- **Deteccion de patrones**: identifica errores recurrentes por estudiante
+- **Dashboard del estudiante**: progreso, dominio por concepto, stats, recomendaciones
+- **Dashboard del profesor**: overview del curso, mastery por tema, errores comunes, progreso individual
+- **Configuracion adaptativa**: pesos de hints, errors, threshold de mastery configurables via env
 
 ### Generales
 - **Gestion documental**: subir PDF/DOCX/TXT/MD, indexacion automatica en base vectorial
@@ -57,7 +72,7 @@ matematicarag/
 ├── api/
 │   ├── auth.go                     # Register, Login, Refresh Token
 │   ├── chat.go                     # Chat con integracion RAG automatica
-│   ├── tutor.go                    # POST /api/tutor/solve (orquestador)
+│   ├── tutor.go                    # POST /api/tutor/solve (orquestador Fase 2)
 │   ├── intent.go                   # Clasificador de intencion (LLM + keywords)
 │   ├── mathclient.go               # Cliente HTTP para Python math service
 │   ├── math.go                     # Operaciones matematicas via SymPy
@@ -74,9 +89,18 @@ matematicarag/
 │   ├── analytics.go                # Analiticas de uso
 │   ├── indexer.go                  # Re-indexacion (ADMIN)
 │   ├── migration.go                # Helpers para migracion de datos
-│   └── middleware.go               # JWT Auth + Role middleware
+│   ├── middleware.go               # JWT Auth + Role middleware
+│   ├── knowledge.go                # Grafo de conceptos + prerrequisitos
+│   ├── learning.go                 # Perfiles de estudiante + mastery tracking
+│   ├── adaptive.go                 # Motor adaptativo (siguiente concepto, dificultad)
+│   ├── exercises.go                # Banco de ejercicios, generacion, validacion
+│   ├── sessions.go                 # Ciclo de vida de sesiones (crear, responder, hint, feedback)
+│   ├── errors.go                   # Taxonomia de errores + deteccion de patrones
+│   ├── teacher.go                  # Dashboard del profesor (progreso, temas, errores)
+│   ├── student_dash.go             # Dashboard del estudiante (progreso, stats)
+│   └── learning_test.go            # Tests de integracion (stubs)
 ├── math-service/
-│   ├── app.py                      # Flask API (11 endpoints matematicos)
+│   ├── app.py                      # Flask API (12 endpoints matematicos)
 │   ├── Dockerfile                  # Python 3.11-slim + SymPy
 │   ├── requirements.txt            # flask, sympy, gunicorn
 │   ├── engine/
@@ -94,13 +118,17 @@ matematicarag/
 │       ├── test_matrices.py        # Tests: matrices
 │       └── test_verify.py          # Tests: verificacion
 ├── internal/
-│   ├── config/config.go            # Variables de entorno (incluye math service)
-│   ├── database/database.go        # PostgreSQL + Migraciones
+│   ├── config/config.go            # Variables de entorno (incluye adaptive engine)
+│   ├── database/database.go        # PostgreSQL + 20+ migraciones
 │   └── middleware/middleware.go     # CORS + Rate Limiting
 ├── frontend/src/app/
 │   ├── core/
 │   │   ├── guards/                 # Auth + Role guards
-│   │   ├── services/               # Auth + API + Tutor services
+│   │   ├── services/
+│   │   │   ├── auth.service.ts     # Autenticacion JWT
+│   │   │   ├── api.service.ts      # Cliente API (chat, tutor, math, docs)
+│   │   │   ├── learning.service.ts # Cliente API de aprendizaje (sesiones, ejercicios, dashboards)
+│   │   │   └── theme.service.ts    # Toggle dark/light
 │   │   └── interceptors/           # HTTP interceptors (auth, errors)
 │   ├── shared/
 │   │   ├── layout.component.ts     # Sidebar + responsive layout
@@ -108,16 +136,18 @@ matematicarag/
 │   └── modules/
 │       ├── auth/                   # Login + Register
 │       ├── chat/                   # Chat con IA + fuentes clickeables
-│       ├── tutor/                  # Tutor matematico paso a paso
+│       ├── tutor/                  # Tutor matematico (4 modos: resolver/tutor/practicar/repaso)
 │       ├── math/                   # Calculadora matematica (MathLive)
 │       ├── documents/              # Gestion de archivos + vista de chunks
 │       ├── bdvectorial/            # Visor de docs en Qdrant
 │       ├── history/                # Historial de sesiones
-│       ├── dashboard/              # Dashboard (Admin/Teacher)
+│       ├── student-progress/       # Dashboard del estudiante (mastery, stats, recomendaciones)
+│       ├── teacher-dashboard/      # Dashboard del profesor (progreso, errores, estudiantes)
+│       ├── dashboard/              # Dashboard admin (estadisticas)
 │       ├── admin/                  # Panel administrativo
 │       └── settings/               # Configuracion (prompts, API keys, IA)
 ├── scripts/
-│   └── seed.go                     # Script de datos de ejemplo
+│   └── seed.go                     # Script de datos de ejemplo (usuarios + conceptos)
 ├── Dockerfile                      # Multi-stage (Node + Go + Alpine)
 ├── docker-compose.yml              # Qdrant + Backend + Frontend + Math Service
 └── .env.example                    # Template de variables
@@ -127,22 +157,55 @@ matematicarag/
 
 ```
 Browser → Go Server (8008)
-            ├── /api/tutor/solve   → Orquestador del tutor
+            │
+            ├── /api/tutor/solve        → Orquestador del tutor (Fase 2)
             │   ├── ClassifyIntent (LLM: identifica tipo de problema)
             │   ├── HybridSearch (Qdrant vectorial + PostgreSQL keyword)
             │   ├── RerankResults (LLM: re-evalua relevancia)
             │   ├── MathClient → Python/SymPy (calculo symbolic)
             │   ├── LLM (genera explicacion paso a paso)
             │   └── Verification (verifica resultado matematico)
-            ├── /api/chat          → Chat + RAG automatico
-            ├── /api/rag           → Consultas RAG directas
-            ├── /api/math          → Operaciones matematicas via SymPy
-            ├── /api/documents     → Upload + chunking + embeddings
-            ├── /api/indexer       → Re-indexacion (ADMIN)
-            ├── /health            → Health check
-            └── /*                 → Angular SPA (archivos estaticos)
+            │
+            ├── /api/sessions/*          → Tutor adaptativo (Fase 3)
+            │   ├── POST /session        → Crear sesion (tutor/practice/review/exam)
+            │   ├── POST /answer         → Responder ejercicio (verifica + mastery)
+            │   ├── POST /hint           → Solicitar pista progresiva
+            │   └── POST /feedback       → Analizar procedimiento paso a paso
+            │
+            ├── /api/exercises/*         → Banco de ejercicios (Fase 3)
+            │   ├── POST /generate       → Generar ejercicio (LLM + validacion SymPy)
+            │   ├── GET /concept/{id}    → Ejercicio por concepto
+            │   └── GET /{id}/hints      → Pistas de un ejercicio
+            │
+            ├── /api/learning/*          → Knowledge model (Fase 3)
+            │   ├── GET /courses/{id}/concepts   → Arbol de conceptos
+            │   ├── GET /courses/{id}/prerequisites → Prerrequisitos
+            │   ├── GET /progress       → Perfil + mastery del estudiante
+            │   ├── GET /mastery        → Mapa de dominio por concepto
+            │   └── GET /errors         → Errores del estudiante
+            │
+            ├── /api/student/*           → Dashboard estudiante (Fase 3)
+            │   ├── GET /my-progress    → Progreso completo
+            │   └── GET /recommendations → Siguiente concepto recomendado
+            │
+            ├── /api/teacher/*           → Dashboard profesor (Fase 3, requiere TEACHER/ADMIN)
+            │   ├── GET /course-progress    → Resumen del curso
+            │   ├── GET /topic-mastery      → Dominio por tema
+            │   ├── GET /common-errors      → Errores comunes
+            │   └── GET /student-progress   → Progreso individual
+            │
+            ├── /api/chat               → Chat + RAG automatico
+            ├── /api/rag                → Consultas RAG directas
+            ├── /api/math               → Operaciones matematicas via SymPy
+            ├── /api/documents          → Upload + chunking + embeddings
+            ├── /api/indexer            → Re-indexacion (ADMIN)
+            └── /*                      → Angular SPA (archivos estaticos)
 
-Go Server → PostgreSQL (users, sessions, messages, documents, chunks, settings)
+Go Server → PostgreSQL (users, sessions, messages, documents, chunks, settings,
+                        concepts, concept_prerequisites, student_profiles,
+                        concept_mastery, exercises, tutor_sessions,
+                        exercise_attempts, attempt_steps, student_errors,
+                        learning_recommendations)
 Go Server → Qdrant (vectores con payload enriquecido)
 Go Server → OpenAI API (GPT-4 + text-embedding-3-small)
 Go Server → Python Math Service (SymPy symbolic computation)
@@ -170,29 +233,70 @@ Go Server → Python Math Service (SymPy symbolic computation)
 10. Response:   Frontend renderiza chips clickeables con expand
 ```
 
-## Pipeline del Tutor
+## Pipeline del Tutor Adaptativo
 
 ```
 Pregunta del alumno
         ↓
-Clasificacion (LLM + keyword fallback)
+┌─ Modo RESOLVER (Fase 2) ─────────────────────┐
+│  Clasificacion (LLM + keyword fallback)       │
+│  RAG Hibrido (Qdrant + PostgreSQL)            │
+│  Math Engine (SymPy via Python service)        │
+│  Verificacion automatica                       │
+│  LLM genera explicacion paso a paso           │
+│  Citation Engine                               │
+│  Respuesta estructurada                        │
+└───────────────────────────────────────────────┘
+        │
         ↓
-RAG Hibrido (Qdrant + PostgreSQL)
-        ↓
-Contexto academico recuperado
-        ↓
-Math Engine (SymPy via Python service)
-        ↓
-Verificacion automatica
-        ↓
-LLM genera explicacion paso a paso
-        ↓
-Citation Engine
-        ↓
-Respuesta estructurada:
-  📚 Fuente academica
-  🧮 Calculo verificado
-  ✅ Resultado verificado
+┌─ Modos TUTOR/PRACTICA/REPASO (Fase 3) ───────┐
+│  Crear sesion adaptativa                       │
+│  RecomendNext (motor adaptativo)               │
+│  ├─ Selecciona concepto por mastery            │
+│  ├─ Calcula dificultad (mastery + errors)      │
+│  └─ Verifica prerrequisitos                    │
+│  GenerateExercise (LLM + validacion SymPy)      │
+│  Presenta ejercicio al alumno                  │
+│  Alumno responde                               │
+│  SubmitAnswer:                                 │
+│  ├─ MathClient.Verify (respuesta correcta?)    │
+│  ├─ analyzeSteps (correccion paso a paso)      │
+│  ├─ UpdateMastery (ajusta nivel)               │
+│  ├─ RecordError (si hay error)                 │
+│  └─ DetectPatterns (errores recurrentes)       │
+│  Feedback + siguiente ejercicio                │
+└───────────────────────────────────────────────┘
+```
+
+## Grafo de Conocimiento
+
+```
+matematica-1 (curso)
+├── algebra
+│   ├── algebra.operaciones      (dificultad 1)
+│   ├── algebra.factorizacion    (dificultad 2)
+│   └── algebra.ecuaciones       (dificultad 2)
+├── funciones
+│   ├── funciones.lineal         (dificultad 1)
+│   ├── funciones.cuadratica     (dificultad 2)
+│   └── funciones.composicion    (dificultad 3)
+├── limites
+│   ├── limites.concepto         (dificultad 2)
+│   ├── limites.propiedades      (dificultad 3)
+│   └── limites.laterales        (dificultad 3)
+├── derivadas
+│   ├── derivadas.definicion     (dificultad 3)
+│   ├── derivadas.potencia       (dificultad 3)
+│   ├── derivadas.producto       (dificultad 4)
+│   ├── derivadas.cociente       (dificultad 4)
+│   └── derivadas.cadena         (dificultad 4)
+└── integrales
+    ├── integrales.indefinida    (dificultad 4)
+    ├── integrales.definida      (dificultad 4)
+    ├── integrales.sustitucion   (dificultad 5)
+    └── integrales.partes        (dificultad 5)
+
+Prerrequisitos: algebra → funciones → limites → derivadas → integrales
 ```
 
 ## Usuarios de Ejemplo
@@ -259,6 +363,78 @@ Modos disponibles:
 - `hint` — Da pistas sin resolver completamente
 - `explain_error` — Localiza el error en el procedimiento del alumno
 
+### Sessions — Tutor Adaptativo (requiere auth)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| POST | `/api/sessions/session` | Crear sesion adaptativa (tutor/practice/review/exam) |
+| POST | `/api/sessions/answer` | Responder ejercicio (verifica + actualiza mastery) |
+| POST | `/api/sessions/hint` | Solicitar pista progresiva |
+| POST | `/api/sessions/feedback` | Analizar procedimiento paso a paso |
+
+Crear sesion:
+```json
+{ "mode": "practice", "course_id": "matematica-1" }
+```
+
+Enviar respuesta:
+```json
+{
+  "session_id": "uuid",
+  "exercise_id": "uuid",
+  "answer": "x = -2, x = -3",
+  "procedure": ["x^2+5x+6=0", "(x+2)(x+3)=0", "x=-2, x=-3"]
+}
+```
+
+Response:
+```json
+{
+  "correct": true,
+  "score": 1.0,
+  "feedback": "¡Correcto! Excelente resolución.",
+  "mastery_before": 0.35,
+  "mastery_after": 0.40,
+  "mastery_status": "learning",
+  "math_verified": true,
+  "next_exercise": { "id": "...", "statement": "...", "difficulty": 3 }
+}
+```
+
+### Ejercicios (requiere auth)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| POST | `/api/exercises/generate` | Generar ejercicio (LLM + validacion SymPy) |
+| GET | `/api/exercises/concept/{id}` | Ejercicio por concepto |
+| GET | `/api/exercises/{id}/hints` | Pistas de un ejercicio |
+
+### Learning — Knowledge Model (requiere auth)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/learning/courses/{id}/concepts` | Arbol de conceptos |
+| GET | `/api/learning/courses/{id}/prerequisites` | Prerrequisitos |
+| GET | `/api/learning/progress` | Perfil + mastery del estudiante |
+| GET | `/api/learning/mastery` | Mapa de dominio por concepto |
+| GET | `/api/learning/errors` | Errores del estudiante |
+
+### Student Dashboard (requiere auth)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/student/my-progress` | Progreso completo (perfil, mastery, errores, stats) |
+| GET | `/api/student/recommendations` | Siguiente concepto recomendado |
+
+### Teacher Dashboard (requiere auth + TEACHER/ADMIN)
+
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/teacher/course-progress` | Resumen del curso |
+| GET | `/api/teacher/topic-mastery` | Dominio por tema |
+| GET | `/api/teacher/common-errors` | Errores comunes del curso |
+| GET | `/api/teacher/student-progress` | Progreso individual de estudiantes |
+
 ### Chat (requiere auth)
 
 | Metodo | Ruta | Descripcion |
@@ -303,6 +479,7 @@ Endpoints del microservicio Python (no expuestos directamente al frontend):
 | POST | `/math/expand` | Expandir |
 | POST | `/math/matrix` | Operaciones con matrices |
 | POST | `/math/verify` | Verificar resultado |
+| POST | `/math/validate-exercise` | Validar ejercicio generado |
 
 ### Documents (requiere auth)
 
@@ -397,6 +574,12 @@ RAG_MIN_SCORE=0.70
 ENABLE_HYBRID_SEARCH=true
 ENABLE_RERANKER=true
 ENABLE_CITATIONS=true
+
+# === ADAPTIVE ENGINE (opcional — valores por defecto) ===
+ADAPTIVE_HINT_WEIGHT=0.1
+ADAPTIVE_ERROR_WEIGHT=0.03
+ADAPTIVE_MASTERY_THRESHOLD=0.8
+ADAPTIVE_MAX_DIFFICULTY=5
 ```
 
 ### Math Service (Python)
@@ -412,7 +595,7 @@ El sistema soporta multiples proveedores de IA, configurable desde **Configuraci
 
 | Proveedor | Modelos soportados | Uso |
 |-----------|-------------------|-----|
-| OpenAI | gpt-4.1, gpt-4o, o3, o4-mini | Chat, RAG, Tutor, Clasificacion |
+| OpenAI | gpt-4.1, gpt-4o, o3, o4-mini | Chat, RAG, Tutor, Clasificacion, Ejercicios |
 | Anthropic | claude-opus-4-7, claude-sonnet-4-6, claude-haiku-4-5 | Chat, RAG |
 | Groq | llama-4-scout, llama-3.3-70b, mixtral-8x7b | Chat rapido |
 | OpenRouter | Multiples proveedores con una sola key | Acceso flex |
@@ -479,7 +662,7 @@ OPENAI_API_KEY=sk-...
 # === QDRANT ===
 QDRANT_HOST=host-del-qdrant
 QDRANT_PORT=6333
-QDRANT_API_KEY=0ylktnefcidr4f6dvkmwfoxc4nrgtywh
+QDRANT_API_KEY=tu_qdrant_api_key
 
 # === MATH SERVICE ===
 MATH_SERVICE_URL=http://math-service:5000
@@ -487,6 +670,12 @@ MATH_TIMEOUT=5
 
 # === CORS ===
 CORS_ALLOWED_ORIGINS=https://matematica.face-unt.ar
+
+# === ADAPTIVE ENGINE ===
+ADAPTIVE_HINT_WEIGHT=0.1
+ADAPTIVE_ERROR_WEIGHT=0.03
+ADAPTIVE_MASTERY_THRESHOLD=0.8
+ADAPTIVE_MAX_DIFFICULTY=5
 ```
 
 #### Servicio Math Service
@@ -539,17 +728,25 @@ curl -X POST https://matematica.face-unt.ar/api/tutor/solve \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"query": "Que es una derivada?"}'
+
+# Verificar sesion adaptativa
+curl -X POST https://matematica.face-unt.ar/api/sessions/session \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "practice", "course_id": "matematica-1"}'
 ```
 
 ## Seed de Datos
 
-Para crear los usuarios de ejemplo:
+Para crear los usuarios de ejemplo y el grafo de conceptos:
 
 ```bash
 cd scripts
 export DB_URL="postgresql://user:pass@host:5432/matematica?sslmode=disable"
 go run seed.go
 ```
+
+Los conceptos de matematica-1 se crean automaticamente via migraciones (arbol de 22 conceptos con prerrequisitos).
 
 ## Tests
 
@@ -565,6 +762,13 @@ python -m pytest tests/ -v
 ```bash
 cd .
 go run ./cmd/ragtest
+```
+
+### Learning Integration (Go)
+
+```bash
+# Requiere PostgreSQL + math-service corriendo
+go test ./api/ -run TestMastery -v
 ```
 
 ## Footer
