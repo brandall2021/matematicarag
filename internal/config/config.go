@@ -35,6 +35,13 @@ type Config struct {
 	AdaptiveErrorWeight     float64
 	AdaptiveMasteryThreshold float64
 	AdaptiveMaxDifficulty   int
+	// Assessment Engine
+	AssessmentDefaultTimeLimit  int
+	AssessmentMaxAttempts       int
+	AssessmentPassingScore      float64
+	AssessmentAutoGradeEnabled  bool
+	AssessmentRecoveryThreshold float64
+	AssessmentAlertThreshold    float64
 }
 
 func Load() *Config {
@@ -67,6 +74,13 @@ func Load() *Config {
 		AdaptiveErrorWeight:     getEnvFloat("ADAPTIVE_ERROR_WEIGHT", 0.03),
 		AdaptiveMasteryThreshold: getEnvFloat("ADAPTIVE_MASTERY_THRESHOLD", 0.8),
 		AdaptiveMaxDifficulty:   getEnvInt("ADAPTIVE_MAX_DIFFICULTY", 5),
+		// Assessment Engine
+		AssessmentDefaultTimeLimit:  getEnvInt("ASSESSMENT_DEFAULT_TIME_LIMIT", 60),
+		AssessmentMaxAttempts:       getEnvInt("ASSESSMENT_MAX_ATTEMPTS", 3),
+		AssessmentPassingScore:      getEnvFloat("ASSESSMENT_PASSING_SCORE", 0.6),
+		AssessmentAutoGradeEnabled:  getEnvBool("ASSESSMENT_AUTO_GRADE_ENABLED", true),
+		AssessmentRecoveryThreshold: getEnvFloat("ASSESSMENT_RECOVERY_THRESHOLD", 0.6),
+		AssessmentAlertThreshold:    getEnvFloat("ASSESSMENT_ALERT_THRESHOLD", 0.4),
 	}
 }
 
