@@ -123,6 +123,7 @@ export interface AcademicAlert {
   acknowledged: boolean;
   acknowledged_by?: string;
   acknowledged_at?: string;
+  created_at?: string;
   metadata?: any;
 }
 
