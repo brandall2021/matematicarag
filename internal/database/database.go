@@ -343,6 +343,171 @@ func Migrate(db *pgxpool.Pool) error {
 		 ('integrales.partes', 'integrales.indefinida'),
 		 ('integrales.partes', 'derivadas.producto')
 		 ON CONFLICT DO NOTHING`,
+
+		// Assessment System
+		`CREATE TABLE IF NOT EXISTS assessments (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			title VARCHAR(255) NOT NULL,
+			description TEXT DEFAULT '',
+			course_id VARCHAR(100) NOT NULL DEFAULT 'matematica-1',
+			assessment_type VARCHAR(30) NOT NULL DEFAULT 'formative'
+				CHECK (assessment_type IN ('diagnostic','formative','summative','recovery','practice')),
+			mode VARCHAR(20) NOT NULL DEFAULT 'fixed'
+				CHECK (mode IN ('fixed','generated','adaptive')),
+			time_limit_minutes INTEGER DEFAULT 0,
+			max_attempts INTEGER DEFAULT 1,
+			shuffle_questions BOOLEAN DEFAULT true,
+			show_results BOOLEAN DEFAULT true,
+			show_solutions BOOLEAN DEFAULT false,
+			passing_score REAL DEFAULT 0.6 CHECK (passing_score BETWEEN 0.0 AND 1.0),
+			total_points INTEGER DEFAULT 100,
+			created_by UUID REFERENCES users(id),
+			status VARCHAR(20) NOT NULL DEFAULT 'draft'
+				CHECK (status IN ('draft','published','archived')),
+			published_at TIMESTAMP WITH TIME ZONE,
+			expires_at TIMESTAMP WITH TIME ZONE,
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_assessments_course ON assessments(course_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_assessments_type ON assessments(assessment_type)`,
+		`CREATE INDEX IF NOT EXISTS idx_assessments_status ON assessments(status)`,
+
+		`CREATE TABLE IF NOT EXISTS assessment_questions (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			assessment_id UUID NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+			exercise_id UUID REFERENCES exercises(id),
+			question_order INTEGER NOT NULL DEFAULT 0,
+			points INTEGER NOT NULL DEFAULT 10,
+			question_type VARCHAR(20) NOT NULL DEFAULT 'exercise'
+				CHECK (question_type IN ('exercise','generated','text','multiple_choice')),
+			statement_override TEXT DEFAULT '',
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_assessment_questions_assessment ON assessment_questions(assessment_id)`,
+
+		`CREATE TABLE IF NOT EXISTS rubrics (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			assessment_id UUID NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+			name VARCHAR(255) NOT NULL,
+			description TEXT DEFAULT '',
+			rubric_type VARCHAR(20) NOT NULL DEFAULT 'analytic'
+				CHECK (rubric_type IN ('analytic','holistic')),
+			max_score REAL NOT NULL DEFAULT 1.0,
+			criteria JSONB NOT NULL DEFAULT '[]',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_rubrics_assessment ON rubrics(assessment_id)`,
+
+		`CREATE TABLE IF NOT EXISTS student_assessments (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			assessment_id UUID NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+			status VARCHAR(20) NOT NULL DEFAULT 'in_progress'
+				CHECK (status IN ('in_progress','submitted','graded','returned')),
+			started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			submitted_at TIMESTAMP WITH TIME ZONE,
+			graded_at TIMESTAMP WITH TIME ZONE,
+			time_spent_seconds INTEGER DEFAULT 0,
+			attempt_number INTEGER DEFAULT 1,
+			total_score REAL DEFAULT 0.0,
+			max_score REAL DEFAULT 0.0,
+			percentage REAL DEFAULT 0.0,
+			passed BOOLEAN DEFAULT false,
+			graded_by UUID REFERENCES users(id),
+			feedback TEXT DEFAULT '',
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(student_id, assessment_id, attempt_number)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_assessments_student ON student_assessments(student_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_assessments_assessment ON student_assessments(assessment_id)`,
+
+		`CREATE TABLE IF NOT EXISTS student_answers (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_assessment_id UUID NOT NULL REFERENCES student_assessments(id) ON DELETE CASCADE,
+			question_id UUID NOT NULL REFERENCES assessment_questions(id) ON DELETE CASCADE,
+			answer TEXT DEFAULT '',
+			procedure JSONB DEFAULT '[]',
+			is_correct BOOLEAN DEFAULT false,
+			score REAL DEFAULT 0.0 CHECK (score BETWEEN 0.0 AND 1.0),
+			points_earned REAL DEFAULT 0.0,
+			points_possible INTEGER DEFAULT 10,
+			math_verified BOOLEAN DEFAULT false,
+			rubric_scores JSONB DEFAULT '{}',
+			feedback TEXT DEFAULT '',
+			time_spent_seconds INTEGER DEFAULT 0,
+			submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			graded_at TIMESTAMP WITH TIME ZONE,
+			grading_method VARCHAR(20) DEFAULT 'auto'
+				CHECK (grading_method IN ('auto','manual','hybrid'))
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_answers_assessment ON student_answers(student_assessment_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_answers_question ON student_answers(question_id)`,
+
+		`CREATE TABLE IF NOT EXISTS student_analytics (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			course_id VARCHAR(100) NOT NULL DEFAULT 'matematica-1',
+			total_assessments INTEGER DEFAULT 0,
+			passed_assessments INTEGER DEFAULT 0,
+			average_score REAL DEFAULT 0.0,
+			average_time_seconds INTEGER DEFAULT 0,
+			competency_level VARCHAR(20) DEFAULT 'beginner'
+				CHECK (competency_level IN ('beginner','developing','proficient','advanced','exceptional')),
+			competency_score REAL DEFAULT 0.0,
+			weakest_concepts JSONB DEFAULT '[]',
+			strongest_concepts JSONB DEFAULT '[]',
+			improvement_trend REAL DEFAULT 0.0,
+			study_streak_days INTEGER DEFAULT 0,
+			last_assessment_at TIMESTAMP WITH TIME ZONE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(student_id, course_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_analytics_student ON student_analytics(student_id)`,
+
+		`CREATE TABLE IF NOT EXISTS recovery_plans (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			course_id VARCHAR(100) NOT NULL DEFAULT 'matematica-1',
+			trigger_assessment_id UUID REFERENCES assessments(id),
+			trigger_score REAL DEFAULT 0.0,
+			status VARCHAR(20) NOT NULL DEFAULT 'active'
+				CHECK (status IN ('active','completed','expired','cancelled')),
+			priority INTEGER DEFAULT 1 CHECK (priority BETWEEN 1 AND 5),
+			concepts_to_review JSONB DEFAULT '[]',
+			recommended_activities JSONB DEFAULT '[]',
+			target_date TIMESTAMP WITH TIME ZONE,
+			completed_at TIMESTAMP WITH TIME ZONE,
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_recovery_plans_student ON recovery_plans(student_id)`,
+
+		`CREATE TABLE IF NOT EXISTS academic_alerts (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			alert_type VARCHAR(50) NOT NULL,
+			severity VARCHAR(20) NOT NULL DEFAULT 'warning'
+				CHECK (severity IN ('info','warning','critical')),
+			title VARCHAR(255) NOT NULL,
+			message TEXT NOT NULL,
+			concept_id VARCHAR(100) DEFAULT '',
+			assessment_id UUID REFERENCES assessments(id),
+			acknowledged BOOLEAN DEFAULT false,
+			acknowledged_by UUID REFERENCES users(id),
+			acknowledged_at TIMESTAMP WITH TIME ZONE,
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_academic_alerts_student ON academic_alerts(student_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_academic_alerts_type ON academic_alerts(alert_type)`,
+		`CREATE INDEX IF NOT EXISTS idx_academic_alerts_severity ON academic_alerts(severity)`,
 	}
 
 	for _, m := range migrations {
