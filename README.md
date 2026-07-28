@@ -37,6 +37,18 @@ Tutor de matematicas universitarias con Inteligencia Artificial, RAG (Retrieval-
 - **Dashboard del profesor**: overview del curso, mastery por tema, errores comunes, progreso individual
 - **Configuracion adaptativa**: pesos de hints, errors, threshold de mastery configurables via env
 
+### Fase 4 — Sistema de Evaluacion y Calificacion Inteligente
+- **Evaluaciones multiples**: diagnosticas, formativas, sumativas, de recuperacion y practica
+- **Modos de evaluacion**: fija (profesor selecciona), generada (IA crea con RAG), adaptativa (se ajusta al rendimiento)
+- **Calificacion inteligente**: validacion matematica + reglas + rbricas + LLM cuando es necesario
+- **Puntuacion parcial**: soporte para evaluacion paso a paso con deteccion de errores
+- **Rubricas de evaluacion**: rbricas analiticas y holsticas con multiples criterios
+- **Calificacion en lote**: calificacion automatica masiva de evaluaciones
+- **Analiticas de estudiantes**: nivel de competencia, tendencias de rendimiento, conceptos dbiles/fuertes
+- **Planes de recuperacion**: recomendaciones personalizadas basadas en rendimiento
+- **Alertas academicas**: sistema de temprana deteccion de estudiantes en riesgo
+- **Configuracion**: time limit, max attempts, passing score, auto-grade, recovery threshold, alert threshold
+
 ### Generales
 - **Gestion documental**: subir PDF/DOCX/TXT/MD, indexacion automatica en base vectorial
 - **Extraccion de metadata**: paginas (PDF), secciones (heuristica), tipos de contenido (definicion, teorema, formula, ejemplo)
@@ -119,7 +131,7 @@ matematicarag/
 │       └── test_verify.py          # Tests: verificacion
 ├── internal/
 │   ├── config/config.go            # Variables de entorno (incluye adaptive engine)
-│   ├── database/database.go        # PostgreSQL + 20+ migraciones
+│   ├── database/database.go        # PostgreSQL + 28+ migraciones
 │   └── middleware/middleware.go     # CORS + Rate Limiting
 ├── frontend/src/app/
 │   ├── core/
@@ -128,6 +140,7 @@ matematicarag/
 │   │   │   ├── auth.service.ts     # Autenticacion JWT
 │   │   │   ├── api.service.ts      # Cliente API (chat, tutor, math, docs)
 │   │   │   ├── learning.service.ts # Cliente API de aprendizaje (sesiones, ejercicios, dashboards)
+│   │   │   ├── assessment.service.ts # Cliente API de evaluaciones (CRUD, grading, analytics, recovery, alerts)
 │   │   │   └── theme.service.ts    # Toggle dark/light
 │   │   └── interceptors/           # HTTP interceptors (auth, errors)
 │   ├── shared/
@@ -143,6 +156,8 @@ matematicarag/
 │       ├── history/                # Historial de sesiones
 │       ├── student-progress/       # Dashboard del estudiante (mastery, stats, recomendaciones)
 │       ├── teacher-dashboard/      # Dashboard del profesor (progreso, errores, estudiantes)
+│       ├── assessment/              # Tomar evaluaciones (timer, navegacion, resultados)
+│       ├── analytics/               # Panel de analiticas (competencia, recuperacion, alertas)
 │       ├── dashboard/              # Dashboard admin (estadisticas)
 │       ├── admin/                  # Panel administrativo
 │       └── settings/               # Configuracion (prompts, API keys, IA)
@@ -194,6 +209,39 @@ Browser → Go Server (8008)
             │   ├── GET /common-errors      → Errores comunes
             │   └── GET /student-progress   → Progreso individual
             │
+            ├── /api/assessments/*        → Evaluaciones (Fase 4)
+            │   ├── POST /                → Crear evaluacion (profesor)
+            │   ├── GET /                 → Listar evaluaciones
+            │   ├── GET /{id}             → Obtener evaluacion con preguntas
+            │   ├── POST /{id}/start      → Iniciar evaluacion (estudiante)
+            │   ├── POST /{id}/submit     → Enviar respuestas
+            │   ├── GET /{id}/results     → Ver resultados
+            │   └── GET /{id}/student-results → Resultados de todos los estudiantes
+            │
+            ├── /api/grading/*            → Calificacion (Fase 4)
+            │   ├── POST /answer/{id}     → Calificacion manual
+            │   ├── POST /rubric/{id}     → Crear rbrica
+            │   ├── POST /evaluate/{id}   → Evaluar con rbrica
+            │   └── POST /batch-grade/{id} → Calificacion automatica en lote
+            │
+            ├── /api/analytics/v2/*       → Analiticas (Fase 4)
+            │   ├── GET /student/{id}     → Analiticas del estudiante
+            │   ├── GET /course/{id}      → Analiticas del curso
+            │   ├── GET /student/{id}/competency → Reporte de competencia
+            │   └── GET /student/{id}/trend → Tendencia de rendimiento
+            │
+            ├── /api/recovery/*           → Planes de recuperacion (Fase 4)
+            │   ├── POST /               → Crear plan
+            │   ├── GET /                → Obtener planes activos
+            │   ├── PUT /{id}/complete    → Marcar como completado
+            │   └── PUT /{id}/cancel      → Cancelar plan
+            │
+            ├── /api/alerts/*            → Alertas academicas (Fase 4)
+            │   ├── GET /                → Obtener alertas del estudiante
+            │   ├── PUT /{id}/acknowledge → Reconocer alerta
+            │   ├── POST /check          → Verificar y crear alertas
+            │   └── GET /all             → Todas las alertas (profesor/admin)
+            │
             ├── /api/chat               → Chat + RAG automatico
             ├── /api/rag                → Consultas RAG directas
             ├── /api/math               → Operaciones matematicas via SymPy
@@ -205,7 +253,9 @@ Go Server → PostgreSQL (users, sessions, messages, documents, chunks, settings
                         concepts, concept_prerequisites, student_profiles,
                         concept_mastery, exercises, tutor_sessions,
                         exercise_attempts, attempt_steps, student_errors,
-                        learning_recommendations)
+                        learning_recommendations, assessments, assessment_questions,
+                        rubrics, student_assessments, student_answers,
+                        student_analytics, recovery_plans, academic_alerts)
 Go Server → Qdrant (vectores con payload enriquecido)
 Go Server → OpenAI API (GPT-4 + text-embedding-3-small)
 Go Server → Python Math Service (SymPy symbolic computation)
