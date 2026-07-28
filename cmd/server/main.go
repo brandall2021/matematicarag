@@ -60,6 +60,7 @@ func main() {
 			r.Route("/concepts", api.KnowledgeRoutes(db))
 			r.Route("/exercises", api.ExerciseRoutes(db, cfg))
 			r.Route("/sessions", api.SessionRoutes(db, cfg))
+			r.Route("/assessments", api.AssessmentRoutes(db, cfg))
 		})
 
 		r.Group(func(r chi.Router) {
