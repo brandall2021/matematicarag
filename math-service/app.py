@@ -150,6 +150,16 @@ def math_verify():
     result = verify_result(data['expression'], expected)
     return jsonify(result)
 
+@app.route('/math/validate-exercise', methods=['POST'])
+@with_timeout
+def math_validate_exercise():
+    data = request.get_json()
+    if not data or 'expression' not in data:
+        return jsonify({'error': 'Expression is required'}), 400
+    expected = data.get('expected', '')
+    result = verify_result(data['expression'], expected)
+    return jsonify(result)
+
 if __name__ == '__main__':
     port = int(os.environ.get('MATH_PORT', 5000))
     app.run(host='0.0.0.0', port=port)

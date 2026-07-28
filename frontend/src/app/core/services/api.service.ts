@@ -92,4 +92,16 @@ export class ApiService {
   tutorSolve(request: TutorRequest): Observable<TutorResponse> {
     return this.http.post<TutorResponse>(`${this.baseUrl}/tutor/solve`, request);
   }
+
+  createTutorSession(mode: string, courseID?: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/sessions/session`, { mode, course_id: courseID || 'matematica-1' });
+  }
+
+  submitTutorAnswer(sessionID: string, exerciseID: string, answer: string, procedure?: string[]): Observable<any> {
+    return this.http.post(`${this.baseUrl}/sessions/answer`, { session_id: sessionID, exercise_id: exerciseID, answer, procedure });
+  }
+
+  requestTutorHint(sessionID: string, exerciseID: string, hintIndex: number): Observable<any> {
+    return this.http.post(`${this.baseUrl}/sessions/hint`, { session_id: sessionID, exercise_id: exerciseID, hint_index: hintIndex });
+  }
 }
