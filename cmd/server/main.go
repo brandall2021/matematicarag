@@ -62,6 +62,7 @@ func main() {
 			r.Route("/sessions", api.SessionRoutes(db, cfg))
 			r.Route("/assessments", api.AssessmentRoutes(db, cfg))
 			r.Route("/grading", api.GradeRoutes(db, cfg))
+			r.Route("/analytics/v2", api.AnalyticsV2Routes(db, cfg))
 		})
 
 		r.Group(func(r chi.Router) {
