@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/brandall2021/matematicarag/api/adaptive"
 	"github.com/brandall2021/matematicarag/api/agent"
 	"github.com/brandall2021/matematicarag/internal/config"
 	"github.com/go-chi/chi/v5"
@@ -112,7 +113,7 @@ func getEnvSetting(key string) string {
 	return os.Getenv(key)
 }
 
-func BuildAgentToolDependencies(db *pgxpool.Pool, cfg *config.Config, mathClient *MathClient) *agent.ToolDependencies {
+func BuildAgentToolDependencies(db *pgxpool.Pool, cfg *config.Config, mathClient *MathClient, adaptEngine *adaptive.AdaptiveEngine) *agent.ToolDependencies {
 	return &agent.ToolDependencies{
 		HybridSearchFn: func(ctx context.Context, query string, filters map[string]any, topK int, vectorWeight, keywordWeight float64) ([]map[string]any, error) {
 			filtersTyped := make(map[string]interface{})
@@ -291,6 +292,7 @@ func BuildAgentToolDependencies(db *pgxpool.Pool, cfg *config.Config, mathClient
 				"needs_review":  true,
 			}, nil
 		},
+		AdaptiveEngine: adaptEngine,
 	}
 }
 

@@ -3,20 +3,38 @@ package agent
 import (
 	"context"
 
+	"github.com/brandall2021/matematicarag/api/adaptive"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type LearningUpdater struct {
-	db *pgxpool.Pool
+	db             *pgxpool.Pool
+	adaptiveEngine *adaptive.AdaptiveEngine
 }
 
-func NewLearningUpdater(db *pgxpool.Pool) *LearningUpdater {
-	return &LearningUpdater{db: db}
+func NewLearningUpdater(db *pgxpool.Pool, ae *adaptive.AdaptiveEngine) *LearningUpdater {
+	return &LearningUpdater{db: db, adaptiveEngine: ae}
 }
 
 func (lu *LearningUpdater) UpdateAfterInteraction(ctx context.Context, studentID, courseID, conceptID string, correct bool, hintsUsed int, score float64) error {
 	if conceptID == "" {
 		return nil
+	}
+
+	if lu.adaptiveEngine != nil {
+		event := &adaptive.LearningEvent{
+			StudentID: studentID,
+			CourseID:  courseID,
+			ConceptID: conceptID,
+			EventType: "attempt",
+			Correct:   correct,
+			HintsUsed: hintsUsed,
+			Score:     score,
+		}
+		err := lu.adaptiveEngine.Events.ProcessEvent(lu.adaptiveEngine, event)
+		if err == nil {
+			return nil
+		}
 	}
 
 	_, err := lu.db.Exec(ctx,

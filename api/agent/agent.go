@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/brandall2021/matematicarag/api/adaptive"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -43,6 +44,7 @@ func NewPedagogicalAgent(
 	cfg *AgentConfig,
 	toolRegistry *ToolRegistry,
 	callLLM LLMFunc,
+	adaptEngine *adaptive.AdaptiveEngine,
 ) *PedagogicalAgent {
 	return &PedagogicalAgent{
 		classifier:      NewIntentClassifier(db, cfg, callLLM),
@@ -51,7 +53,7 @@ func NewPedagogicalAgent(
 		planner:         NewPlanner(NewDecisionEngine(cfg)),
 		toolRegistry:    toolRegistry,
 		responseGen:     NewResponseGenerator(callLLM, cfg),
-		learningUpdater: NewLearningUpdater(db),
+		learningUpdater: NewLearningUpdater(db, adaptEngine),
 		auditLogger:     NewAuditLogger(db),
 		cfg:             cfg,
 	}

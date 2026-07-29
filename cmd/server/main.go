@@ -53,19 +53,6 @@ func main() {
 	agentCfg.LowMastery = cfg.AgentLowMastery
 	agentCfg.HighMastery = cfg.AgentHighMastery
 
-	toolDeps := api.BuildAgentToolDependencies(db, cfg, mathClient)
-	agentRegistry := agent.NewToolRegistry()
-	agent.RegisterAllTools(agentRegistry, toolDeps)
-
-	pedagogicalAgent := agent.NewPedagogicalAgent(
-		db,
-		&agentCfg,
-		agentRegistry,
-		func(ctx context.Context, prompt string) (string, error) {
-			return api.CallLLMForAgent(ctx, db, prompt)
-		},
-	)
-
 	adaptCfg := &adaptive.AdaptiveConfig{
 		MasteryOldWeight:      cfg.MasteryOldWeight,
 		MasteryEvidenceWeight: cfg.MasteryEvidenceWeight,
@@ -79,6 +66,20 @@ func main() {
 		MaxDifficulty:         cfg.AdaptiveMaxDifficulty,
 	}
 	adaptEngine := adaptive.NewAdaptiveEngine(db, adaptCfg)
+
+	toolDeps := api.BuildAgentToolDependencies(db, cfg, mathClient, adaptEngine)
+	agentRegistry := agent.NewToolRegistry()
+	agent.RegisterAllTools(agentRegistry, toolDeps)
+
+	pedagogicalAgent := agent.NewPedagogicalAgent(
+		db,
+		&agentCfg,
+		agentRegistry,
+		func(ctx context.Context, prompt string) (string, error) {
+			return api.CallLLMForAgent(ctx, db, prompt)
+		},
+		adaptEngine,
+	)
 
 	apiRouter.Route("/api", func(r chi.Router) {
 		r.Route("/auth", api.AuthRoutes(db, cfg))

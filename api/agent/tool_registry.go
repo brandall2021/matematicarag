@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/brandall2021/matematicarag/api/adaptive"
 )
 
 type ToolFunc func(ctx context.Context, input map[string]any) (map[string]any, error)
@@ -77,6 +79,7 @@ type ToolDependencies struct {
 	StudentProfileFn   func(ctx context.Context, studentID, courseID string) (map[string]any, error)
 	ExerciseGenerateFn func(ctx context.Context, concept string, difficulty int, studentID string) (map[string]any, error)
 	GradeFn           func(ctx context.Context, studentAnswer, expectedAnswer string) (map[string]any, error)
+	AdaptiveEngine    *adaptive.AdaptiveEngine
 }
 
 func (tr *ToolRegistry) ListTools() []ToolDefinition {
