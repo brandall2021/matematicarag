@@ -275,4 +275,74 @@ export class AssessmentService {
     if (severity) params = params.set('severity', severity);
     return this.http.get<any[]>(`${this.baseUrl}/alerts/all`, { params });
   }
+
+  // Question Bank methods
+  getQuestions(filters: any): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters.concept_id) params = params.set('concept_id', filters.concept_id);
+    if (filters.type) params = params.set('type', filters.type);
+    if (filters.min_difficulty) params = params.set('min_difficulty', filters.min_difficulty);
+    if (filters.max_difficulty) params = params.set('max_difficulty', filters.max_difficulty);
+    return this.http.get<any[]>(`${this.baseUrl}/questions/`, { params });
+  }
+
+  createQuestion(question: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/questions/`, question);
+  }
+
+  validateQuestion(questionId: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/questions/validate/${questionId}`, {});
+  }
+
+  // Autosave and resume
+  autosave(assessmentId: string, answers: any, currentIndex: number, timeSpent: number): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/assessments/${assessmentId}/autosave`, {
+      answers,
+      current_index: currentIndex,
+      time_spent_seconds: timeSpent
+    });
+  }
+
+  resumeAssessment(assessmentId: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/assessments/${assessmentId}/resume`, {});
+  }
+
+  // Adaptive assessment
+  adaptiveNext(assessmentId: string, answeredCorrectly: boolean, questionId: string): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/assessments/${assessmentId}/adaptive-next`, {
+      answered_correctly: answeredCorrectly,
+      question_id: questionId
+    });
+  }
+
+  // Export
+  exportAssessmentCSV(assessmentId: string): void {
+    window.open(`${this.baseUrl}/export/assessment/${assessmentId}/csv`, '_blank');
+  }
+
+  exportStudentCSV(studentId: string): void {
+    window.open(`${this.baseUrl}/export/student/${studentId}/csv`, '_blank');
+  }
+
+  exportCourseCSV(courseId: string): void {
+    window.open(`${this.baseUrl}/export/course/${courseId}/csv`, '_blank');
+  }
+
+  // Analytics
+  getCompetencyMatrix(courseId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/analytics/v2/course/${courseId}/matrix`);
+  }
+
+  getErrorPatterns(courseId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/analytics/v2/course/${courseId}/error-patterns`);
+  }
+
+  getQuestionHistory(studentId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/analytics/v2/student/${studentId}/question-history`);
+  }
+
+  // Audit
+  getAuditLog(entityType: string, entityId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/audit/${entityType}/${entityId}`);
+  }
 }

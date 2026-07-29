@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/brandall2021/matematicarag/internal/config"
@@ -110,6 +111,141 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
+		})
+
+		r.Get("/course/{courseID}/matrix", func(w http.ResponseWriter, r *http.Request) {
+			courseID := chi.URLParam(r, "courseID")
+			ctx := context.Background()
+
+			rows, err := db.Query(ctx, `
+				SELECT
+					c.id AS concept_id,
+					c.name,
+					COUNT(DISTINCT sa.student_id) AS total_students,
+					COALESCE(AVG(CASE WHEN sa.is_correct THEN 1.0 ELSE 0.0 END), 0) AS success_rate
+				FROM concepts c
+				LEFT JOIN question_bank qb ON qb.concept_id = c.id
+				LEFT JOIN student_answers sa ON sa.question_id = qb.id
+				WHERE c.course_id = $1
+				GROUP BY c.id, c.name
+				ORDER BY c.name`, courseID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			type ConceptMatrix struct {
+				ConceptID      string  `json:"concept_id"`
+				Name           string  `json:"name"`
+				TotalStudents  int     `json:"total_students"`
+				SuccessRate    float64 `json:"success_rate"`
+				NeedsAttention bool    `json:"needs_attention"`
+			}
+
+			var matrix []ConceptMatrix
+			for rows.Next() {
+				var m ConceptMatrix
+				if err := rows.Scan(&m.ConceptID, &m.Name, &m.TotalStudents, &m.SuccessRate); err != nil {
+					continue
+				}
+				m.NeedsAttention = m.SuccessRate < 0.6
+				matrix = append(matrix, m)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(matrix)
+		})
+
+		r.Get("/course/{courseID}/error-patterns", func(w http.ResponseWriter, r *http.Request) {
+			courseID := chi.URLParam(r, "courseID")
+			ctx := context.Background()
+
+			rows, err := db.Query(ctx, `
+				SELECT
+					c.id AS concept_id,
+					c.name AS concept_name,
+					qb.statement AS question,
+					COUNT(*) AS error_count,
+					COUNT(DISTINCT sa.student_id) AS affected_students
+				FROM student_answers sa
+				JOIN question_bank qb ON sa.question_id = qb.id
+				JOIN concepts c ON qb.concept_id = c.id
+				WHERE sa.is_correct = FALSE AND c.course_id = $1
+				GROUP BY c.id, c.name, qb.statement
+				HAVING COUNT(*) > 2
+				ORDER BY error_count DESC
+				LIMIT 20`, courseID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			type ErrorPattern struct {
+				ConceptID       string `json:"concept_id"`
+				ConceptName     string `json:"concept_name"`
+				Question        string `json:"question"`
+				ErrorCount      int    `json:"error_count"`
+				AffectedStudents int   `json:"affected_students"`
+			}
+
+			var patterns []ErrorPattern
+			for rows.Next() {
+				var p ErrorPattern
+				if err := rows.Scan(&p.ConceptID, &p.ConceptName, &p.Question, &p.ErrorCount, &p.AffectedStudents); err != nil {
+					continue
+				}
+				patterns = append(patterns, p)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(patterns)
+		})
+
+		r.Get("/student/{studentID}/question-history", func(w http.ResponseWriter, r *http.Request) {
+			studentID := chi.URLParam(r, "studentID")
+			ctx := context.Background()
+
+			rows, err := db.Query(ctx, `
+				SELECT
+					sa.question_id,
+					qb.statement,
+					sa.answer,
+					sa.is_correct,
+					sa.score,
+					sa.created_at
+				FROM student_answers sa
+				JOIN question_bank qb ON sa.question_id = qb.id
+				WHERE sa.student_id = $1
+				ORDER BY sa.created_at DESC
+				LIMIT 50`, studentID)
+			if err != nil {
+				http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			type QuestionHistory struct {
+				QuestionID string      `json:"question_id"`
+				Statement  string      `json:"statement"`
+				Answer     string      `json:"answer"`
+				IsCorrect  bool        `json:"is_correct"`
+				Score      float64     `json:"score"`
+				CreatedAt  interface{} `json:"created_at"`
+			}
+
+			var history []QuestionHistory
+			for rows.Next() {
+				var h QuestionHistory
+				if err := rows.Scan(&h.QuestionID, &h.Statement, &h.Answer, &h.IsCorrect, &h.Score, &h.CreatedAt); err != nil {
+					continue
+				}
+				history = append(history, h)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(history)
 		})
 	}
 }

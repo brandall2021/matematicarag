@@ -62,9 +62,12 @@ func main() {
 			r.Route("/sessions", api.SessionRoutes(db, cfg))
 			r.Route("/assessments", api.AssessmentRoutes(db, cfg))
 			r.Route("/grading", api.GradeRoutes(db, cfg))
+			r.Route("/questions", api.QuestionRoutes(db, cfg))
 			r.Route("/analytics/v2", api.AnalyticsV2Routes(db, cfg))
 			r.Route("/recovery", api.RecoveryRoutes(db, cfg))
 			r.Route("/alerts", api.AlertRoutes(db, cfg))
+			r.Route("/export", api.ExportRoutes(db))
+			r.Route("/audit", api.AuditRoutes(db))
 		})
 
 		r.Group(func(r chi.Router) {

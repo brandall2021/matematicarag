@@ -44,7 +44,16 @@ Tutor de matematicas universitarias con Inteligencia Artificial, RAG (Retrieval-
 - **Puntuacion parcial**: soporte para evaluacion paso a paso con deteccion de errores
 - **Rubricas de evaluacion**: rbricas analiticas y holsticas con multiples criterios
 - **Calificacion en lote**: calificacion automatica masiva de evaluaciones
+- **Banco de preguntas**: repositorio de preguntas con tipos exercise, multiple_choice, true_false, numeric, algebraic, equation, step_by_step
+- **Validacion matematica**: todas las preguntas validadas por Math Engine antes de almacenar
+- **Guardado automatico**: autosave cada 30 segundos durante evaluacion
+- **Recuperacion de sesion**: resume donde quedaste tras conexion
+- **Evaluaciones adaptativas**: dificultad se ajusta automaticamente al rendimiento (niveles 1-5)
+- **Exportacion**: CSV para evaluaciones, estudiantes y cursos
+- **Auditoria**: registro de cambios con versionado (old/new values)
 - **Analiticas de estudiantes**: nivel de competencia, tendencias de rendimiento, conceptos dbiles/fuertes
+- **Matriz de competencias**: success rate por concepto para todo el curso
+- **Patrones de errores colectivos**: detecta errores recurrentes en todos los estudiantes
 - **Planes de recuperacion**: recomendaciones personalizadas basadas en rendimiento
 - **Alertas academicas**: sistema de temprana deteccion de estudiantes en riesgo
 - **Configuracion**: time limit, max attempts, passing score, auto-grade, recovery threshold, alert threshold
@@ -110,6 +119,10 @@ matematicarag/
 │   ├── errors.go                   # Taxonomia de errores + deteccion de patrones
 │   ├── teacher.go                  # Dashboard del profesor (progreso, temas, errores)
 │   ├── student_dash.go             # Dashboard del estudiante (progreso, stats)
+│   ├── questions.go                # Banco de preguntas CRUD + validacion
+│   ├── adaptive_assessment.go      # Motor de evaluacion adaptativa
+│   ├── export.go                   # Exportacion CSV (evaluaciones, cursos)
+│   ├── audit.go                    # Registro de auditoria + versionado
 │   └── learning_test.go            # Tests de integracion (stubs)
 ├── math-service/
 │   ├── app.py                      # Flask API (12 endpoints matematicos)
@@ -131,7 +144,7 @@ matematicarag/
 │       └── test_verify.py          # Tests: verificacion
 ├── internal/
 │   ├── config/config.go            # Variables de entorno (incluye adaptive engine)
-│   ├── database/database.go        # PostgreSQL + 28+ migraciones
+│   ├── database/database.go        # PostgreSQL + 31 migraciones
 │   └── middleware/middleware.go     # CORS + Rate Limiting
 ├── frontend/src/app/
 │   ├── core/
@@ -213,14 +226,29 @@ Browser → Go Server (8008)
             │   ├── POST /                → Crear evaluacion (profesor)
             │   ├── GET /                 → Listar evaluaciones
             │   ├── GET /{id}             → Obtener evaluacion con preguntas
+            │   ├── PUT /{id}             → Actualizar evaluacion
+            │   ├── DELETE /{id}          → Eliminar evaluacion
+            │   ├── POST /{id}/publish    → Publicar evaluacion
             │   ├── POST /{id}/start      → Iniciar evaluacion (estudiante)
             │   ├── POST /{id}/submit     → Enviar respuestas
+            │   ├── POST /{id}/autosave   → Guardar respuestas automaticamente
+            │   ├── POST /{id}/resume     → Recuperar sesion de evaluacion
+            │   ├── POST /{id}/adaptive-next → Siguiente pregunta adaptativa
             │   ├── GET /{id}/results     → Ver resultados
             │   └── GET /{id}/student-results → Resultados de todos los estudiantes
+            │
+            ├── /api/questions/*          → Banco de Preguntas (Fase 4)
+            │   ├── POST /                → Crear pregunta
+            │   ├── GET /                 → Listar preguntas (filtros: concepto, tipo, dificultad)
+            │   ├── GET /{id}             → Obtener pregunta
+            │   ├── PUT /{id}             → Actualizar pregunta
+            │   ├── DELETE /{id}          → Soft delete (is_active=false)
+            │   └── POST /validate/{id}   → Validar con Math Engine
             │
             ├── /api/grading/*            → Calificacion (Fase 4)
             │   ├── POST /answer/{id}     → Calificacion manual
             │   ├── POST /rubric/{id}     → Crear rbrica
+            │   ├── GET /rubric/{id}      → Obtener rbricas
             │   ├── POST /evaluate/{id}   → Evaluar con rbrica
             │   └── POST /batch-grade/{id} → Calificacion automatica en lote
             │
@@ -228,7 +256,11 @@ Browser → Go Server (8008)
             │   ├── GET /student/{id}     → Analiticas del estudiante
             │   ├── GET /course/{id}      → Analiticas del curso
             │   ├── GET /student/{id}/competency → Reporte de competencia
-            │   └── GET /student/{id}/trend → Tendencia de rendimiento
+            │   ├── GET /student/{id}/trend → Tendencia de rendimiento
+            │   ├── POST /student/{id}/update → Recalcular analiticas
+            │   ├── GET /course/{id}/matrix → Matriz de competencias
+            │   ├── GET /course/{id}/error-patterns → Patrones de errores colectivos
+            │   └── GET /student/{id}/question-history → Historial de preguntas
             │
             ├── /api/recovery/*           → Planes de recuperacion (Fase 4)
             │   ├── POST /               → Crear plan
@@ -241,6 +273,14 @@ Browser → Go Server (8008)
             │   ├── PUT /{id}/acknowledge → Reconocer alerta
             │   ├── POST /check          → Verificar y crear alertas
             │   └── GET /all             → Todas las alertas (profesor/admin)
+            │
+            ├── /api/export/*            → Exportacion (Fase 4)
+            │   ├── GET /assessment/{id}/csv → Exportar resultados de evaluacion
+            │   ├── GET /student/{id}/csv    → Exportar historial de estudiante
+            │   └── GET /course/{id}/csv     → Exportar analiticas del curso
+            │
+            ├── /api/audit/*             → Auditoria (Fase 4)
+            │   └── GET /{entityType}/{entityId} → Log de auditoria
             │
             ├── /api/chat               → Chat + RAG automatico
             ├── /api/rag                → Consultas RAG directas
@@ -255,7 +295,8 @@ Go Server → PostgreSQL (users, sessions, messages, documents, chunks, settings
                         exercise_attempts, attempt_steps, student_errors,
                         learning_recommendations, assessments, assessment_questions,
                         rubrics, student_assessments, student_answers,
-                        student_analytics, recovery_plans, academic_alerts)
+                        student_analytics, recovery_plans, academic_alerts,
+                        question_bank, assessment_sessions, audit_log_entries)
 Go Server → Qdrant (vectores con payload enriquecido)
 Go Server → OpenAI API (GPT-4 + text-embedding-3-small)
 Go Server → Python Math Service (SymPy symbolic computation)

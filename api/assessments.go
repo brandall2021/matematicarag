@@ -222,6 +222,85 @@ func AssessmentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			json.NewEncoder(w).Encode(result)
 		})
 
+		r.Post("/{assessmentID}/autosave", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			assessmentID := chi.URLParam(r, "assessmentID")
+
+			var req struct {
+				Answers         map[string]string `json:"answers"`
+				CurrentIndex    int               `json:"current_index"`
+				TimeSpentSeconds int              `json:"time_spent_seconds"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+				return
+			}
+
+			var saID string
+			err := db.QueryRow(context.Background(),
+				`SELECT id FROM student_assessments
+				 WHERE student_id = $1 AND assessment_id = $2 AND status = 'in_progress'
+				 ORDER BY attempt_number DESC LIMIT 1`,
+				studentID, assessmentID,
+			).Scan(&saID)
+			if err != nil {
+				http.Error(w, `{"error":"no active assessment"}`, http.StatusNotFound)
+				return
+			}
+
+			answersJSON, err := json.Marshal(req.Answers)
+			if err != nil {
+				http.Error(w, `{"error":"invalid answers"}`, http.StatusBadRequest)
+				return
+			}
+
+			_, err = db.Exec(context.Background(),
+				`INSERT INTO assessment_sessions (student_assessment_id, answers_snapshot, current_question_index, time_spent_seconds, last_saved_at)
+				 VALUES ($1, $2, $3, $4, NOW())
+				 ON CONFLICT (student_assessment_id) DO UPDATE SET
+				 answers_snapshot = EXCLUDED.answers_snapshot,
+				 current_question_index = EXCLUDED.current_question_index,
+				 time_spent_seconds = EXCLUDED.time_spent_seconds,
+				 last_saved_at = NOW()`,
+				saID, answersJSON, req.CurrentIndex, req.TimeSpentSeconds,
+			)
+			if err != nil {
+				log.Printf("[ASSESSMENT] autosave error: %v", err)
+				http.Error(w, `{"error":"failed to save"}`, http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+		})
+
+		r.Post("/{assessmentID}/resume", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			assessmentID := chi.URLParam(r, "assessmentID")
+
+			var answersSnapshot json.RawMessage
+			var currentIndex int
+			var timeSpent int
+			err := db.QueryRow(context.Background(),
+				`SELECT as2.answers_snapshot, as2.current_question_index, as2.time_spent_seconds
+				 FROM assessment_sessions as2
+				 JOIN student_assessments sa ON sa.id = as2.student_assessment_id
+				 WHERE sa.student_id = $1 AND sa.assessment_id = $2 AND sa.status = 'in_progress'
+				 ORDER BY sa.attempt_number DESC LIMIT 1`,
+				studentID, assessmentID,
+			).Scan(&answersSnapshot, &currentIndex, &timeSpent)
+			if err != nil {
+				http.Error(w, `{"error":"no session to resume"}`, http.StatusNotFound)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"answers":           answersSnapshot,
+				"current_index":     currentIndex,
+				"time_spent_seconds": timeSpent,
+			})
+		})
+
 		r.Get("/{assessmentID}/results", func(w http.ResponseWriter, r *http.Request) {
 			studentID := r.Context().Value(UserIDKey).(string)
 			assessmentID := chi.URLParam(r, "assessmentID")
@@ -245,6 +324,8 @@ func AssessmentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(results)
 		})
+
+		r.Post("/{assessmentID}/adaptive-next", AdaptiveNextHandler(db))
 	}
 }
 
@@ -285,6 +366,8 @@ func CreateAssessment(db *pgxpool.Pool, teacherID string, req *struct {
 		}
 	}
 
+	LogAuditEvent(db, "assessment", a.ID, "create", teacherID, nil, a)
+
 	return &a, nil
 }
 
@@ -303,9 +386,11 @@ func GetAssessment(db *pgxpool.Pool, assessmentID string) (map[string]interface{
 
 	rows, err := db.Query(ctx,
 		`SELECT aq.id, aq.assessment_id, aq.exercise_id, aq.question_order, aq.points, aq.question_type, aq.statement_override, aq.metadata,
-		        e.statement, e.latex, e.expected_answer, e.difficulty, e.concept_id
+		        e.statement, e.latex, e.expected_answer, e.difficulty, e.concept_id,
+		        qb.statement, qb.latex, qb.expected_answer, qb.difficulty, qb.concept_id, qb.question_type, qb.answer_options
 		 FROM assessment_questions aq
 		 LEFT JOIN exercises e ON aq.exercise_id = e.id
+		 LEFT JOIN question_bank qb ON aq.metadata->>'question_bank_id' = qb.id
 		 WHERE aq.assessment_id = $1
 		 ORDER BY aq.question_order`, assessmentID)
 	if err != nil {
@@ -329,29 +414,76 @@ func GetAssessment(db *pgxpool.Pool, assessmentID string) (map[string]interface{
 			ExpectedAnswer    *string
 			Difficulty        *int
 			ConceptID         *string
+			QBStatement       *string
+			QBLatex           *string
+			QBExpectedAnswer  *string
+			QBDifficulty      *int
+			QBConceptID       *string
+			QBQuestionType    *string
+			QBAnswerOptions   json.RawMessage
 		}
 		if err := rows.Scan(&q.ID, &q.AssessmentID, &q.ExerciseID, &q.QuestionOrder, &q.Points, &q.QuestionType, &q.StatementOverride, &q.Metadata,
-			&q.Statement, &q.Latex, &q.ExpectedAnswer, &q.Difficulty, &q.ConceptID); err != nil {
+			&q.Statement, &q.Latex, &q.ExpectedAnswer, &q.Difficulty, &q.ConceptID,
+			&q.QBStatement, &q.QBLatex, &q.QBExpectedAnswer, &q.QBDifficulty, &q.QBConceptID, &q.QBQuestionType, &q.QBAnswerOptions); err != nil {
 			continue
 		}
+
+		statement := q.Statement
+		latex := q.Latex
+		expectedAnswer := q.ExpectedAnswer
+		difficulty := q.Difficulty
+		conceptID := q.ConceptID
+		questionType := q.QuestionType
+		answerOptions := q.QBAnswerOptions
+
+		if q.ExerciseID == nil {
+			if q.QBStatement != nil {
+				statement = q.QBStatement
+			}
+			if q.QBLatex != nil {
+				latex = q.QBLatex
+			}
+			if q.QBExpectedAnswer != nil {
+				expectedAnswer = q.QBExpectedAnswer
+			}
+			if q.QBDifficulty != nil {
+				difficulty = q.QBDifficulty
+			}
+			if q.QBConceptID != nil {
+				conceptID = q.QBConceptID
+			}
+			if q.QBQuestionType != nil {
+				questionType = *q.QBQuestionType
+			}
+		}
+
 		question := map[string]interface{}{
 			"id":                 q.ID,
 			"question_order":     q.QuestionOrder,
 			"points":             q.Points,
-			"question_type":      q.QuestionType,
+			"question_type":      questionType,
 			"statement_override": q.StatementOverride,
 		}
-		if q.Statement != nil {
-			question["statement"] = *q.Statement
+		if statement != nil {
+			question["statement"] = *statement
 		}
-		if q.Latex != nil {
-			question["latex"] = *q.Latex
+		if latex != nil {
+			question["latex"] = *latex
 		}
-		if q.Difficulty != nil {
-			question["difficulty"] = *q.Difficulty
+		if expectedAnswer != nil {
+			question["expected_answer"] = *expectedAnswer
 		}
-		if q.ConceptID != nil {
-			question["concept_id"] = *q.ConceptID
+		if difficulty != nil {
+			question["difficulty"] = *difficulty
+		}
+		if conceptID != nil {
+			question["concept_id"] = *conceptID
+		}
+		if q.ExerciseID != nil {
+			question["exercise_id"] = *q.ExerciseID
+		}
+		if answerOptions != nil {
+			question["answer_options"] = answerOptions
 		}
 		questions = append(questions, question)
 	}
@@ -410,13 +542,21 @@ func UpdateAssessment(db *pgxpool.Pool, assessmentID string, updates map[string]
 	ctx := context.Background()
 	_, err := db.Exec(ctx,
 		`UPDATE assessments SET updated_at = NOW() WHERE id = $1`, assessmentID)
-	return err
+	if err != nil {
+		return err
+	}
+	LogAuditEvent(db, "assessment", assessmentID, "update", "", nil, updates)
+	return nil
 }
 
 func DeleteAssessment(db *pgxpool.Pool, assessmentID string) error {
 	ctx := context.Background()
 	_, err := db.Exec(ctx, `DELETE FROM assessments WHERE id = $1`, assessmentID)
-	return err
+	if err != nil {
+		return err
+	}
+	LogAuditEvent(db, "assessment", assessmentID, "delete", "", nil, nil)
+	return nil
 }
 
 func PublishAssessment(db *pgxpool.Pool, assessmentID string) error {
@@ -424,7 +564,11 @@ func PublishAssessment(db *pgxpool.Pool, assessmentID string) error {
 	_, err := db.Exec(ctx,
 		`UPDATE assessments SET status = 'published', published_at = NOW(), updated_at = NOW() WHERE id = $1 AND status = 'draft'`,
 		assessmentID)
-	return err
+	if err != nil {
+		return err
+	}
+	LogAuditEvent(db, "assessment", assessmentID, "publish", "", nil, map[string]string{"status": "published"})
+	return nil
 }
 
 func StartAssessment(db *pgxpool.Pool, studentID, assessmentID string) (*StudentAssessment, []AssessmentQuestion, error) {
@@ -547,6 +691,83 @@ func SubmitAssessment(db *pgxpool.Pool, cfg *config.Config, studentID, assessmen
 					feedback = "Correcto"
 				} else {
 					feedback = "Respuesta incorrecta"
+				}
+			}
+		} else {
+			// Handle question_bank questions
+			var qbQuestion struct {
+				QuestionType   string
+				ExpectedAnswer string
+				AnswerOptions  json.RawMessage
+			}
+			err := db.QueryRow(ctx,
+				`SELECT qb.question_type, qb.expected_answer, qb.answer_options
+				 FROM question_bank qb
+				 JOIN assessment_questions aq ON aq.metadata->>'question_bank_id' = qb.id
+				 WHERE aq.id = $1`, ans.QuestionID,
+			).Scan(&qbQuestion.QuestionType, &qbQuestion.ExpectedAnswer, &qbQuestion.AnswerOptions)
+
+			if err == nil {
+				switch qbQuestion.QuestionType {
+				case "multiple_choice":
+					// Compare selected option
+					isCorrect = ans.Answer == qbQuestion.ExpectedAnswer
+					if isCorrect {
+						score = 1.0
+						feedback = "Correcto"
+					} else {
+						score = 0.0
+						feedback = "Opción incorrecta"
+					}
+				case "true_false":
+					isCorrect = strings.EqualFold(strings.TrimSpace(ans.Answer), strings.TrimSpace(qbQuestion.ExpectedAnswer))
+					if isCorrect {
+						score = 1.0
+						feedback = "Correcto"
+					} else {
+						score = 0.0
+						feedback = "Incorrecto"
+					}
+				case "numeric", "algebraic_expression", "equation":
+					if qbQuestion.ExpectedAnswer != "" {
+						verifyResult, err := mathClient.Verify(ans.Answer, qbQuestion.ExpectedAnswer, "")
+						if err == nil && verifyResult != nil {
+							isCorrect = verifyResult.Success
+							mathVerified = true
+							if isCorrect {
+								score = 1.0
+								feedback = "Correcto"
+							} else {
+								score = 0.3
+								feedback = "Parcialmente correcto"
+							}
+						}
+					}
+				case "step_by_step":
+					// Basic step-by-step: check final answer
+					if qbQuestion.ExpectedAnswer != "" {
+						verifyResult, err := mathClient.Verify(ans.Answer, qbQuestion.ExpectedAnswer, "")
+						if err == nil && verifyResult != nil {
+							isCorrect = verifyResult.Success
+							mathVerified = true
+							if isCorrect {
+								score = 1.0
+								feedback = "Procedimiento correcto"
+							} else {
+								score = 0.5
+								feedback = "Procedimiento parcialmente correcto"
+							}
+						}
+					}
+				default:
+					// Fall back to string comparison
+					isCorrect = strings.EqualFold(strings.TrimSpace(ans.Answer), strings.TrimSpace(qbQuestion.ExpectedAnswer))
+					if isCorrect {
+						score = 1.0
+						feedback = "Correcto"
+					} else {
+						feedback = "Incorrecto"
+					}
 				}
 			}
 		}

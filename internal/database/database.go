@@ -508,6 +508,54 @@ func Migrate(db *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_academic_alerts_student ON academic_alerts(student_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_academic_alerts_type ON academic_alerts(alert_type)`,
 		`CREATE INDEX IF NOT EXISTS idx_academic_alerts_severity ON academic_alerts(severity)`,
+
+		`CREATE TABLE IF NOT EXISTS assessment_sessions (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_assessment_id UUID NOT NULL REFERENCES student_assessments(id) ON DELETE CASCADE,
+			answers_snapshot JSONB NOT NULL DEFAULT '{}',
+			current_question_index INT DEFAULT 0,
+			time_spent_seconds INT DEFAULT 0,
+			last_saved_at TIMESTAMPTZ DEFAULT NOW(),
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			UNIQUE(student_assessment_id)
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS audit_log_entries (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			entity_type VARCHAR(50) NOT NULL,
+			entity_id UUID NOT NULL,
+			action VARCHAR(50) NOT NULL,
+			user_id UUID REFERENCES users(id),
+			old_value JSONB,
+			new_value JSONB,
+			version INT,
+			ip_address INET,
+			user_agent TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+
+		`CREATE TABLE IF NOT EXISTS question_bank (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			statement TEXT NOT NULL,
+			latex TEXT,
+			question_type VARCHAR(50) NOT NULL DEFAULT 'exercise',
+			difficulty INT DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 5),
+			concept_id VARCHAR(100),
+			competencies TEXT[] DEFAULT '{}',
+			expected_answer TEXT,
+			answer_options JSONB,
+			explanation TEXT,
+			explanation_latex TEXT,
+			tags TEXT[] DEFAULT '{}',
+			source VARCHAR(50) DEFAULT 'manual',
+			created_by UUID REFERENCES users(id),
+			validated_by_math BOOLEAN DEFAULT FALSE,
+			version INT DEFAULT 1,
+			is_active BOOLEAN DEFAULT TRUE,
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
 	}
 
 	for _, m := range migrations {

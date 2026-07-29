@@ -73,6 +73,14 @@ import { AssessmentService, Assessment, AssessmentQuestion, StudentAssessment, S
           </div>
         </div>
 
+        <div class="autosave-status">
+          @if (isSaving()) {
+            <span class="saving"><mat-icon class="spin">sync</mat-icon> Guardando...</span>
+          } @else if (lastSaved()) {
+            <span class="saved"><mat-icon>check_circle</mat-icon> Guardado {{ lastSaved() }}</span>
+          }
+        </div>
+
         <mat-progress-bar [value]="((currentIndex() + 1) / questions().length) * 100"></mat-progress-bar>
 
         @if (currentQuestion()) {
@@ -285,6 +293,30 @@ import { AssessmentService, Assessment, AssessmentQuestion, StudentAssessment, S
     .answer-card.incorrect {
       border-left-color: #f44336;
     }
+    .autosave-status {
+      text-align: right;
+      margin-bottom: 8px;
+      font-size: 0.85em;
+      color: #666;
+    }
+    .autosave-status .saving {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .autosave-status .saved {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: #4caf50;
+    }
+    .spin {
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
   `]
 })
 export class AssessmentComponent implements OnInit {
@@ -299,10 +331,14 @@ export class AssessmentComponent implements OnInit {
   answers = signal<Record<string, string>>({});
   studentAssessment = signal<StudentAssessment | null>(null);
   timeRemaining = signal<number | null>(null);
+  timeSpentSeconds = signal(0);
   result = signal<StudentAssessment | null>(null);
   resultAnswers = signal<StudentAnswer[]>([]);
+  isSaving = signal(false);
+  lastSaved = signal<string | null>(null);
 
   private timerInterval: any;
+  private autosaveInterval: any;
 
   currentQuestion = computed(() => {
     const qs = this.questions();
@@ -345,6 +381,8 @@ export class AssessmentComponent implements OnInit {
         this.currentIndex.set(0);
         this.mode.set('taking');
         this.loading.set(false);
+        this.startAutosave();
+        this.checkForResume(assessment.id);
         if (assessment.time_limit_minutes > 0) {
           this.startTimer(assessment.time_limit_minutes * 60);
         }
@@ -414,6 +452,7 @@ export class AssessmentComponent implements OnInit {
 
   submitAssessment() {
     this.saveCurrentAnswer();
+    this.stopAutosave();
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
@@ -462,14 +501,57 @@ export class AssessmentComponent implements OnInit {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
+    this.stopAutosave();
     this.mode.set('list');
     this.currentAssessment.set(null);
     this.loadAssessments();
+  }
+
+  startAutosave() {
+    this.autosaveInterval = setInterval(() => {
+      if (this.mode() === 'taking' && this.currentAssessment()) {
+        this.isSaving.set(true);
+        const answersObj: Record<string, string> = { ...this.answers() };
+
+        this.assessmentService.autosave(
+          this.currentAssessment()!.id,
+          answersObj,
+          this.currentIndex(),
+          this.timeSpentSeconds()
+        ).subscribe({
+          next: () => {
+            this.isSaving.set(false);
+            this.lastSaved.set(new Date().toLocaleTimeString('es-ES'));
+          },
+          error: () => this.isSaving.set(false)
+        });
+      }
+    }, 30000);
+  }
+
+  stopAutosave() {
+    if (this.autosaveInterval) {
+      clearInterval(this.autosaveInterval);
+    }
+  }
+
+  checkForResume(assessmentId: string) {
+    this.assessmentService.resumeAssessment(assessmentId).subscribe({
+      next: (session) => {
+        if (session && session.answers) {
+          this.answers.set({ ...session.answers });
+          this.currentIndex.set(session.current_index || 0);
+          this.timeSpentSeconds.set(session.time_spent_seconds || 0);
+        }
+      },
+      error: () => {} // No session to resume
+    });
   }
 
   ngOnDestroy() {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
     }
+    this.stopAutosave();
   }
 }

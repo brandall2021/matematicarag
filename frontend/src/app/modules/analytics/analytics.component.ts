@@ -19,7 +19,14 @@ import { LearningService, StudentProfile, ConceptMastery } from '../../core/serv
   ],
   template: `
     <div class="analytics-container">
-      <h2>Panel de Analíticas</h2>
+      <div class="analytics-header">
+        <h2>Panel de Analíticas</h2>
+        <div class="analytics-actions">
+          <button mat-raised-button color="primary" (click)="exportCSV()">
+            <mat-icon>download</mat-icon> Exportar CSV
+          </button>
+        </div>
+      </div>
 
       @if (loading()) {
         <mat-progress-bar mode="indeterminate"></mat-progress-bar>
@@ -201,6 +208,73 @@ import { LearningService, StudentProfile, ConceptMastery } from '../../core/serv
               }
             </div>
           </mat-tab>
+          <mat-tab label="Matriz de Competencias">
+            <div class="competency-section">
+              <mat-card>
+                <mat-card-header>
+                  <mat-card-title>Matriz de Competencias por Curso</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  @if (competencyMatrix().length) {
+                    <table class="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Competencia</th>
+                          <th>Nivel</th>
+                          <th>Puntuación</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (item of competencyMatrix(); track item.competency) {
+                          <tr>
+                            <td>{{ item.competency }}</td>
+                            <td>{{ item.level | titlecase }}</td>
+                            <td>{{ (item.score * 100) | number:'1.0-0' }}%</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p>No hay datos de competencias disponibles</p>
+                  }
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </mat-tab>
+
+          <mat-tab label="Patrones de Errores">
+            <div class="errors-section">
+              <mat-card>
+                <mat-card-header>
+                  <mat-card-title>Patrones de Errores Comunes</mat-card-title>
+                </mat-card-header>
+                <mat-card-content>
+                  @if (errorPatterns().length) {
+                    <table class="analytics-table">
+                      <thead>
+                        <tr>
+                          <th>Concepto</th>
+                          <th>Frecuencia</th>
+                          <th>Descripción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (pattern of errorPatterns(); track pattern.concept) {
+                          <tr>
+                            <td>{{ pattern.concept }}</td>
+                            <td>{{ pattern.frequency }}</td>
+                            <td>{{ pattern.description }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  } @else {
+                    <p>No hay patrones de errores registrados</p>
+                  }
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </mat-tab>
         </mat-tab-group>
       }
     </div>
@@ -210,6 +284,25 @@ import { LearningService, StudentProfile, ConceptMastery } from '../../core/serv
       max-width: 1200px;
       margin: 0 auto;
       padding: 24px;
+    }
+    .analytics-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .analytics-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .analytics-table th,
+    .analytics-table td {
+      padding: 12px;
+      border-bottom: 1px solid #e0e0e0;
+      text-align: left;
+    }
+    .analytics-table th {
+      font-weight: 600;
+      color: #666;
     }
     .analytics-grid {
       display: grid;
@@ -242,7 +335,7 @@ import { LearningService, StudentProfile, ConceptMastery } from '../../core/serv
     .competency-badge[data-level="exceptional"] { color: #9c27b0; }
     .positive { color: #4caf50; }
     .negative { color: #f44336; }
-    .concepts-section, .recovery-section, .alerts-section {
+    .concepts-section, .recovery-section, .alerts-section, .competency-section, .errors-section {
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -273,6 +366,9 @@ export class AnalyticsComponent implements OnInit {
   analytics = signal<StudentAnalytics | null>(null);
   recoveryPlans = signal<RecoveryPlan[]>([]);
   alerts = signal<AcademicAlert[]>([]);
+  competencyMatrix = signal<any[]>([]);
+  errorPatterns = signal<any[]>([]);
+  selectedCourseId = signal<string>('matematica-1');
 
   constructor(
     private assessmentService: AssessmentService,
@@ -304,6 +400,29 @@ export class AnalyticsComponent implements OnInit {
       next: (alerts) => this.alerts.set(alerts || []),
       error: () => {}
     });
+
+    this.loadCompetencyMatrix();
+    this.loadErrorPatterns();
+  }
+
+  loadCompetencyMatrix() {
+    this.assessmentService.getCompetencyMatrix(this.selectedCourseId()).subscribe({
+      next: (matrix) => this.competencyMatrix.set(matrix),
+      error: () => this.competencyMatrix.set([])
+    });
+  }
+
+  loadErrorPatterns() {
+    this.assessmentService.getErrorPatterns(this.selectedCourseId()).subscribe({
+      next: (patterns) => this.errorPatterns.set(patterns),
+      error: () => this.errorPatterns.set([])
+    });
+  }
+
+  exportCSV() {
+    if (this.selectedCourseId()) {
+      this.assessmentService.exportCourseCSV(this.selectedCourseId());
+    }
   }
 
   completePlan(planId: string) {
