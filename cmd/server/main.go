@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/brandall2021/matematicarag/api"
+	"github.com/brandall2021/matematicarag/api/adaptive"
 	"github.com/brandall2021/matematicarag/api/agent"
 	"github.com/brandall2021/matematicarag/internal/config"
 	"github.com/brandall2021/matematicarag/internal/database"
@@ -65,6 +66,20 @@ func main() {
 		},
 	)
 
+	adaptCfg := &adaptive.AdaptiveConfig{
+		MasteryOldWeight:      cfg.MasteryOldWeight,
+		MasteryEvidenceWeight: cfg.MasteryEvidenceWeight,
+		MasteryHintPenalty:    cfg.MasteryHintPenalty,
+		MasteryErrorPenalty:   cfg.MasteryErrorPenalty,
+		MasteryRecencyFactor:  cfg.MasteryRecencyFactor,
+		CriticalThreshold:     cfg.LearningCriticalThreshold,
+		BeginnerThreshold:     cfg.LearningBeginnerThreshold,
+		DevelopingThreshold:   cfg.LearningDevelopingThreshold,
+		CompetentThreshold:    cfg.LearningCompetentThreshold,
+		MaxDifficulty:         cfg.AdaptiveMaxDifficulty,
+	}
+	adaptEngine := adaptive.NewAdaptiveEngine(db, adaptCfg)
+
 	apiRouter.Route("/api", func(r chi.Router) {
 		r.Route("/auth", api.AuthRoutes(db, cfg))
 		r.Route("/chat", api.ChatRoutes(db, cfg))
@@ -79,7 +94,7 @@ func main() {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
 			r.Route("/history", api.HistoryRoutes(db))
 			r.Route("/users", api.UserRoutes(db))
-			r.Route("/learning", api.LearningRoutes(db))
+			r.Route("/learning", api.LearningRoutes(db, adaptEngine))
 			r.Route("/concepts", api.KnowledgeRoutes(db))
 			r.Route("/exercises", api.ExerciseRoutes(db, cfg))
 			r.Route("/sessions", api.SessionRoutes(db, cfg))

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/brandall2021/matematicarag/api/adaptive"
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -43,7 +44,7 @@ type StudentError struct {
 	LastOccurredAt string `json:"last_occurred_at"`
 }
 
-func LearningRoutes(db *pgxpool.Pool) func(r chi.Router) {
+func LearningRoutes(db *pgxpool.Pool, adaptEngine *adaptive.AdaptiveEngine) func(r chi.Router) {
 	return func(r chi.Router) {
 
 		r.Get("/progress", func(w http.ResponseWriter, r *http.Request) {
@@ -81,6 +82,101 @@ func LearningRoutes(db *pgxpool.Pool) func(r chi.Router) {
 			errors, err := GetStudentErrors(db, studentID)
 			if err != nil {
 				http.Error(w, `{"error":"failed to load errors"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(errors)
+		})
+
+		r.Post("/events", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			var event adaptive.LearningEvent
+			if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+				http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+				return
+			}
+			event.StudentID = studentID
+
+			if err := adaptEngine.Events.ProcessEvent(adaptEngine, &event); err != nil {
+				http.Error(w, `{"error":"failed to process event"}`, http.StatusInternalServerError)
+				return
+			}
+
+			state, _ := adaptEngine.Analytics.GetStudentProgress(r.Context(), studentID, "matematica-1")
+			rec, _ := adaptEngine.Recommend.GenerateRecommendation(r.Context(), studentID, "matematica-1", state)
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"mastery":        event.ConceptID,
+				"recommendation": rec,
+			})
+		})
+
+		r.Get("/learner-profile", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			state, err := adaptEngine.Analytics.GetStudentProgress(r.Context(), studentID, "matematica-1")
+			if err != nil {
+				http.Error(w, `{"error":"failed to load learner profile"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(state)
+		})
+
+		r.Get("/recommendation", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			state, err := adaptEngine.Analytics.GetStudentProgress(r.Context(), studentID, "matematica-1")
+			if err != nil {
+				http.Error(w, `{"error":"failed to load learner state"}`, http.StatusInternalServerError)
+				return
+			}
+			rec, err := adaptEngine.Recommend.GenerateRecommendation(r.Context(), studentID, "matematica-1", state)
+			if err != nil {
+				http.Error(w, `{"error":"failed to generate recommendation"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(rec)
+		})
+
+		r.Get("/path", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			path, err := adaptEngine.LearningPath.BuildPath(r.Context(), studentID, "matematica-1")
+			if err != nil {
+				http.Error(w, `{"error":"failed to build learning path"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(path)
+		})
+
+		r.Post("/suggest", func(w http.ResponseWriter, r *http.Request) {
+			var rec adaptive.Recommendation
+			if err := json.NewDecoder(r.Body).Decode(&rec); err != nil {
+				http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+				return
+			}
+			explanation := adaptEngine.Recommend.ExplainRecommendation(&rec)
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]string{
+				"explanation": explanation,
+			})
+		})
+
+		r.Get("/course-analytics", func(w http.ResponseWriter, r *http.Request) {
+			analytics, err := adaptEngine.Analytics.GetCourseAnalytics(r.Context(), "matematica-1")
+			if err != nil {
+				http.Error(w, `{"error":"failed to load course analytics"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(analytics)
+		})
+
+		r.Get("/errors/common", func(w http.ResponseWriter, r *http.Request) {
+			errors, err := adaptEngine.Analytics.GetCommonErrors(r.Context(), "matematica-1")
+			if err != nil {
+				http.Error(w, `{"error":"failed to load common errors"}`, http.StatusInternalServerError)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
