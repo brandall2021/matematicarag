@@ -108,4 +108,24 @@ export class ApiService {
   agentChat(query: string, sessionId?: string, courseId?: string): Observable<any> {
     return this.http.post(`${this.baseUrl}/agent/chat`, { query, session_id: sessionId, course_id: courseId });
   }
+
+  getLearnerProfile(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/learning/profile`);
+  }
+
+  getLearningRecommendation(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/learning/recommendation`);
+  }
+
+  getLearningPath(): Observable<any> {
+    return this.http.get(`${this.baseUrl}/learning/path`);
+  }
+
+  recordLearningEvent(event: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/learning/events`, event);
+  }
+
+  getCourseAnalytics(courseID: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/learning/courses/${courseID}/analytics`);
+  }
 }

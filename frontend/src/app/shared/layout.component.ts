@@ -32,6 +32,7 @@ import { MatIconModule } from '@angular/material/icon';
           <a routerLink="/assessment" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>quiz</mat-icon><span>Evaluaciones</span></a>
           <a routerLink="/analytics" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>analytics</mat-icon><span>Analíticas</span></a>
           <a routerLink="/my-progress" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>trending_up</mat-icon><span>Mi Progreso</span></a>
+          <a routerLink="/aprendizaje" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>insights</mat-icon><span>Aprendizaje</span></a>
           @if (auth.hasRole('ADMIN', 'TEACHER')) {
             <a routerLink="/dashboard" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>dashboard</mat-icon><span>Panel</span></a>
             <a routerLink="/teacher" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>analytics</mat-icon><span>Panel Profesor</span></a>
