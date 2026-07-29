@@ -57,7 +57,7 @@ func (ic *IntentClassifier) ClassifyMulti(ctx context.Context, query string, his
 
 func (ic *IntentClassifier) DetectFrustration(query string) bool {
 	frustrationSignals := []string{
-		"no entiendo nada", "ya lo intenté", "no me sale",
+		"no entiendo", "no entendí", "ya lo intenté", "no me sale",
 		"explicamelo de otra forma", "sigo sin entender",
 		"no tiene sentido", "estoy perdido",
 	}
@@ -76,23 +76,26 @@ func (ic *IntentClassifier) classifyByKeywords(query string) *IntentResult {
 	if matchesAny(lower, []string{"qué es", "qué son", "define", "definición", "concepto", "teoría"}) {
 		return &IntentResult{Intent: IntentExplainConcept, Confidence: 0.70}
 	}
-	if matchesAny(lower, []string{"resuelve", "resolver", "calcula", "calcular", "integra", "deriva"}) {
-		return &IntentResult{Intent: IntentSolveExercise, Confidence: 0.75}
-	}
-	if matchesAny(lower, []string{"está bien", "es correcto", "verifica", "revisa"}) {
-		return &IntentResult{Intent: IntentCheckAnswer, Confidence: 0.70}
-	}
 	if matchesAny(lower, []string{"pista", "ayuda", "dame una pista"}) {
 		return &IntentResult{Intent: IntentGiveHint, Confidence: 0.80}
-	}
-	if matchesAny(lower, []string{"práctica", "practicar", "ejercicio", "quiero practicar"}) {
-		return &IntentResult{Intent: IntentPractice, Confidence: 0.70}
 	}
 	if matchesAny(lower, []string{"compara", "diferencia", "semejanza", "versus"}) {
 		return &IntentResult{Intent: IntentCompareConcepts, Confidence: 0.70}
 	}
 	if matchesAny(lower, []string{"ejemplo"}) {
 		return &IntentResult{Intent: IntentGenerateExample, Confidence: 0.70}
+	}
+	if matchesAny(lower, []string{"está bien", "es correcto", "verifica", "revisa"}) {
+		return &IntentResult{Intent: IntentCheckAnswer, Confidence: 0.70}
+	}
+	if matchesAny(lower, []string{"resuelve", "resolver", "calcula", "calcular"}) {
+		return &IntentResult{Intent: IntentSolveExercise, Confidence: 0.75}
+	}
+	if matchesWholeWord(lower, "deriva", "integra") {
+		return &IntentResult{Intent: IntentSolveExercise, Confidence: 0.75}
+	}
+	if matchesAny(lower, []string{"práctica", "practicar", "quiero practicar"}) {
+		return &IntentResult{Intent: IntentPractice, Confidence: 0.70}
 	}
 	if matchesAny(lower, []string{"fuente", "de dónde", "material", "bibliografía"}) {
 		return &IntentResult{Intent: IntentAskSource, Confidence: 0.75}
@@ -137,6 +140,15 @@ func parseIntentJSON(response string) (*IntentResult, error) {
 		return nil, fmt.Errorf("empty intent")
 	}
 	return &result, nil
+}
+
+func matchesWholeWord(s string, words ...string) bool {
+	for _, w := range words {
+		if strings.Contains(s, " "+w+" ") || strings.HasPrefix(s, w+" ") || strings.HasSuffix(s, " "+w) || s == w {
+			return true
+		}
+	}
+	return false
 }
 
 func matchesAny(s string, keywords []string) bool {
