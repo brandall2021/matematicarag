@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/brandall2021/matematicarag/api"
+	"github.com/brandall2021/matematicarag/api/agent"
 	"github.com/brandall2021/matematicarag/internal/config"
 	"github.com/brandall2021/matematicarag/internal/database"
 	"github.com/brandall2021/matematicarag/internal/middleware"
@@ -41,6 +42,28 @@ func main() {
 	apiRouter.Use(chimw.Timeout(60 * time.Second))
 	apiRouter.Use(middleware.CORS(cfg.CORSOriginsList()))
 	apiRouter.Use(middleware.RateLimit(120))
+
+	mathClient := api.NewMathClient(cfg)
+
+	agentCfg := agent.DefaultAgentConfig()
+	agentCfg.MaxToolCalls = cfg.AgentMaxToolCalls
+	agentCfg.MaxRetries = cfg.AgentMaxRetries
+	agentCfg.IntentThreshold = cfg.AgentIntentThreshold
+	agentCfg.LowMastery = cfg.AgentLowMastery
+	agentCfg.HighMastery = cfg.AgentHighMastery
+
+	toolDeps := api.BuildAgentToolDependencies(db, cfg, mathClient)
+	agentRegistry := agent.NewToolRegistry()
+	agent.RegisterAllTools(agentRegistry, toolDeps)
+
+	pedagogicalAgent := agent.NewPedagogicalAgent(
+		db,
+		&agentCfg,
+		agentRegistry,
+		func(ctx context.Context, prompt string) (string, error) {
+			return api.CallLLMForAgent(ctx, db, prompt)
+		},
+	)
 
 	apiRouter.Route("/api", func(r chi.Router) {
 		r.Route("/auth", api.AuthRoutes(db, cfg))
@@ -81,6 +104,11 @@ func main() {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
 			r.Use(api.RoleMiddleware("TEACHER", "ADMIN"))
 			r.Route("/teacher", api.TeacherRoutes(db))
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(api.AuthMiddleware(cfg.JWTSecret))
+			r.Route("/agent", api.AgentRoutes(db, pedagogicalAgent))
 		})
 	})
 
