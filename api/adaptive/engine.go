@@ -33,10 +33,6 @@ func NewAdaptiveEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *AdaptiveEngine {
 	}
 }
 
-// ——— Stub types (TODO: implement in sub-engine tasks) ———
 
-type ProgressAnalyticsService struct{}
-
-func NewProgressAnalyticsService(db *pgxpool.Pool) *ProgressAnalyticsService  { return &ProgressAnalyticsService{} }
 
 
