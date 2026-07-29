@@ -128,4 +128,12 @@ export class ApiService {
   getCourseAnalytics(courseID: string): Observable<any> {
     return this.http.get(`${this.baseUrl}/learning/courses/${courseID}/analytics`);
   }
+
+  getCourseLearningAnalytics(courseId: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/learning/courses/${courseId}/analytics`);
+  }
+
+  getCommonStudentErrors(courseId: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/teacher/courses/${courseId}/common-errors`);
+  }
 }

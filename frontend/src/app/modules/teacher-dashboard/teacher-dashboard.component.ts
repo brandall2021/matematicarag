@@ -35,7 +35,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 
       @if (topicMastery().length > 0) {
         <div class="section">
-          <h2><mat-icon>school</mat-icon> Dominio por Tema</h2>
+          <h2><mat-icon>school</mat-icon> Rendimiento del Curso</h2>
           <div class="topic-table">
             <div class="topic-header">
               <span>Tema</span><span>Promedio</span><span>Estudiantes</span><span>En dificultad</span>
