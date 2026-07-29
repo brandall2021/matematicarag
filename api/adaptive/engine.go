@@ -35,11 +35,9 @@ func NewAdaptiveEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *AdaptiveEngine {
 
 // ——— Stub types (TODO: implement in sub-engine tasks) ———
 
-type LearningPathEngine struct{}
 type LearningEventService struct{}
 type ProgressAnalyticsService struct{}
 
-func NewLearningPathEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *LearningPathEngine     { return &LearningPathEngine{} }
 func NewLearningEventService(db *pgxpool.Pool) *LearningEventService          { return &LearningEventService{} }
 func NewProgressAnalyticsService(db *pgxpool.Pool) *ProgressAnalyticsService  { return &ProgressAnalyticsService{} }
 
