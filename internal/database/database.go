@@ -556,6 +556,37 @@ func Migrate(db *pgxpool.Pool) error {
 			created_at TIMESTAMPTZ DEFAULT NOW(),
 			updated_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
+		// Agent System
+		`CREATE TABLE IF NOT EXISTS agent_execution_log (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id),
+			session_id UUID,
+			intent TEXT NOT NULL,
+			plan JSONB,
+			tools_used TEXT[],
+			tool_results JSONB,
+			final_response TEXT,
+			duration_ms INTEGER,
+			total_tokens INTEGER,
+			model TEXT,
+			status TEXT DEFAULT 'completed',
+			error TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS agent_sessions (
+			session_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id),
+			course_id VARCHAR(100) NOT NULL DEFAULT 'matematica-1',
+			intent TEXT DEFAULT '',
+			current_concept TEXT DEFAULT '',
+			current_exercise_id UUID,
+			messages JSONB DEFAULT '[]',
+			created_at TIMESTAMPTZ DEFAULT NOW(),
+			updated_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_execution_log_student ON agent_execution_log(student_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_execution_log_created ON agent_execution_log(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_student ON agent_sessions(student_id)`,
 	}
 
 	for _, m := range migrations {

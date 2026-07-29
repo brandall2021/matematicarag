@@ -42,6 +42,13 @@ type Config struct {
 	AssessmentAutoGradeEnabled  bool
 	AssessmentRecoveryThreshold float64
 	AssessmentAlertThreshold    float64
+	// Agent settings
+	AgentMaxToolCalls       int
+	AgentMaxRetries         int
+	AgentIntentThreshold    float64
+	AgentLowMastery         float64
+	AgentHighMastery        float64
+	AgentManualReviewThresh float64
 }
 
 func Load() *Config {
@@ -81,6 +88,13 @@ func Load() *Config {
 		AssessmentAutoGradeEnabled:  getEnvBool("ASSESSMENT_AUTO_GRADE_ENABLED", true),
 		AssessmentRecoveryThreshold: getEnvFloat("ASSESSMENT_RECOVERY_THRESHOLD", 0.6),
 		AssessmentAlertThreshold:    getEnvFloat("ASSESSMENT_ALERT_THRESHOLD", 0.4),
+		// Agent settings
+		AgentMaxToolCalls:       getEnvInt("AGENT_MAX_TOOL_CALLS", 8),
+		AgentMaxRetries:         getEnvInt("AGENT_MAX_RETRIES", 2),
+		AgentIntentThreshold:    getEnvFloat("AGENT_INTENT_THRESHOLD", 0.75),
+		AgentLowMastery:         getEnvFloat("AGENT_LOW_MASTERY", 0.40),
+		AgentHighMastery:        getEnvFloat("AGENT_HIGH_MASTERY", 0.70),
+		AgentManualReviewThresh: getEnvFloat("AGENT_MANUAL_REVIEW_THRESHOLD", 0.65),
 	}
 }
 
