@@ -587,6 +587,48 @@ func Migrate(db *pgxpool.Pool) error {
 		`CREATE INDEX IF NOT EXISTS idx_agent_execution_log_student ON agent_execution_log(student_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_execution_log_created ON agent_execution_log(created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_agent_sessions_student ON agent_sessions(student_id)`,
+
+		// Adaptive Learning Engine — Fase 6
+		`CREATE TABLE IF NOT EXISTS learning_events (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id),
+			course_id VARCHAR(100) NOT NULL,
+			concept_id VARCHAR(255) NOT NULL,
+			activity_id UUID,
+			event_type VARCHAR(50) NOT NULL,
+			difficulty INT DEFAULT 1,
+			correct BOOLEAN,
+			score FLOAT DEFAULT 0,
+			time_seconds INT DEFAULT 0,
+			hints_used INT DEFAULT 0,
+			error_type VARCHAR(50),
+			error_detail TEXT,
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_learning_events_student ON learning_events(student_id, concept_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_learning_events_type ON learning_events(event_type)`,
+		`CREATE TABLE IF NOT EXISTS mastery_history (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id),
+			concept_id VARCHAR(255) NOT NULL,
+			old_mastery FLOAT NOT NULL,
+			new_mastery FLOAT NOT NULL,
+			trigger_event_id UUID,
+			reason TEXT,
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_mastery_history_student ON mastery_history(student_id, concept_id)`,
+		`ALTER TABLE concept_mastery ADD COLUMN IF NOT EXISTS independent_successes INT DEFAULT 0`,
+		`ALTER TABLE concept_mastery ADD COLUMN IF NOT EXISTS average_time_seconds INT DEFAULT 0`,
+		`ALTER TABLE concept_mastery ADD COLUMN IF NOT EXISTS last_success_at TIMESTAMPTZ`,
+		`ALTER TABLE concept_mastery ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMPTZ`,
+		`ALTER TABLE concept_mastery ADD COLUMN IF NOT EXISTS next_review_at TIMESTAMPTZ`,
+		`ALTER TABLE concept_mastery ADD COLUMN IF NOT EXISTS confidence FLOAT DEFAULT 1.0`,
+		`ALTER TABLE student_errors ADD COLUMN IF NOT EXISTS course_id VARCHAR(100)`,
+		`ALTER TABLE student_errors ADD COLUMN IF NOT EXISTS resolved BOOLEAN DEFAULT false`,
+		`ALTER TABLE student_errors ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ`,
+		`ALTER TABLE student_errors ADD COLUMN IF NOT EXISTS attempt_id UUID`,
 	}
 
 	for _, m := range migrations {

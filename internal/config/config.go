@@ -42,6 +42,17 @@ type Config struct {
 	AssessmentAutoGradeEnabled  bool
 	AssessmentRecoveryThreshold float64
 	AssessmentAlertThreshold    float64
+	// Adaptive Learning Engine
+	MasteryOldWeight            float64
+	MasteryEvidenceWeight       float64
+	MasteryHintPenalty          float64
+	MasteryErrorPenalty         float64
+	MasteryRecencyFactor        float64
+	LearningCriticalThreshold   float64
+	LearningBeginnerThreshold   float64
+	LearningDevelopingThreshold float64
+	LearningCompetentThreshold  float64
+	AdaptiveQdrantTopK          int
 	// Agent settings
 	AgentMaxToolCalls       int
 	AgentMaxRetries         int
@@ -88,6 +99,17 @@ func Load() *Config {
 		AssessmentAutoGradeEnabled:  getEnvBool("ASSESSMENT_AUTO_GRADE_ENABLED", true),
 		AssessmentRecoveryThreshold: getEnvFloat("ASSESSMENT_RECOVERY_THRESHOLD", 0.6),
 		AssessmentAlertThreshold:    getEnvFloat("ASSESSMENT_ALERT_THRESHOLD", 0.4),
+		// Adaptive Learning Engine
+		MasteryOldWeight:            getEnvFloat("MASTERY_OLD_WEIGHT", 0.70),
+		MasteryEvidenceWeight:       getEnvFloat("MASTERY_EVIDENCE_WEIGHT", 0.30),
+		MasteryHintPenalty:          getEnvFloat("MASTERY_HINT_PENALTY", 0.10),
+		MasteryErrorPenalty:         getEnvFloat("MASTERY_ERROR_PENALTY", 0.15),
+		MasteryRecencyFactor:        getEnvFloat("MASTERY_RECENCY_FACTOR", 0.60),
+		LearningCriticalThreshold:   getEnvFloat("LEARNING_CRITICAL_THRESHOLD", 0.40),
+		LearningBeginnerThreshold:   getEnvFloat("LEARNING_BEGINNER_THRESHOLD", 0.60),
+		LearningDevelopingThreshold: getEnvFloat("LEARNING_DEVELOPING_THRESHOLD", 0.75),
+		LearningCompetentThreshold:  getEnvFloat("LEARNING_COMPETENT_THRESHOLD", 0.90),
+		AdaptiveQdrantTopK:          getEnvInt("ADAPTIVE_QDRANT_TOP_K", 5),
 		// Agent settings
 		AgentMaxToolCalls:       getEnvInt("AGENT_MAX_TOOL_CALLS", 8),
 		AgentMaxRetries:         getEnvInt("AGENT_MAX_RETRIES", 2),
