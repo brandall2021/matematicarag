@@ -23,6 +23,7 @@ import { MatIconModule } from '@angular/material/icon';
         </div>
         <nav class="sidebar-nav">
           <a routerLink="/chat" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>chat</mat-icon><span>Chat</span></a>
+          <a routerLink="/agente" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>smart_toy</mat-icon><span>Agente</span></a>
           <a routerLink="/math" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>calculate</mat-icon><span>Matematica</span></a>
           <a routerLink="/tutor" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>school</mat-icon><span>Tutor</span></a>
           <a routerLink="/documents" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>folder</mat-icon><span>Documentos</span></a>

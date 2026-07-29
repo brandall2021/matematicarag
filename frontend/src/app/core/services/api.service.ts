@@ -104,4 +104,8 @@ export class ApiService {
   requestTutorHint(sessionID: string, exerciseID: string, hintIndex: number): Observable<any> {
     return this.http.post(`${this.baseUrl}/sessions/hint`, { session_id: sessionID, exercise_id: exerciseID, hint_index: hintIndex });
   }
+
+  agentChat(query: string, sessionId?: string, courseId?: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/agent/chat`, { query, session_id: sessionId, course_id: courseId });
+  }
 }

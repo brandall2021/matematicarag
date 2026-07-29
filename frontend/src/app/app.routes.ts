@@ -13,6 +13,7 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'chat', pathMatch: 'full' },
       { path: 'chat', loadComponent: () => import('./modules/chat/chat.component').then(m => m.ChatComponent) },
+      { path: 'agente', loadComponent: () => import('./modules/agent-chat/agent-chat.component').then(m => m.AgentChatComponent) },
       { path: 'math', loadComponent: () => import('./modules/math/math.component').then(m => m.MathComponent) },
       { path: 'tutor', loadComponent: () => import('./modules/tutor/tutor.component').then(m => m.TutorComponent) },
       { path: 'documents', loadComponent: () => import('./modules/documents/documents.component').then(m => m.DocumentsComponent) },
