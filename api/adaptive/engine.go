@@ -25,7 +25,7 @@ func NewAdaptiveEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *AdaptiveEngine {
 		Mastery:       mastery,
 		Difficulty:    NewDifficultyEngine(cfg),
 		Prerequisites: NewPrerequisiteEngine(db),
-		Errors:        NewErrorAnalyzer(),
+		Errors:        NewErrorAnalyzer(db),
 		Recommend:     NewRecommendationEngine(db, cfg),
 		LearningPath:  NewLearningPathEngine(db, cfg),
 		Events:        NewLearningEventService(db),
@@ -35,28 +35,18 @@ func NewAdaptiveEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *AdaptiveEngine {
 
 // ——— Stub types (TODO: implement in sub-engine tasks) ———
 
-type MasteryEngine struct{}
 type DifficultyEngine struct{}
 type PrerequisiteEngine struct{}
-type ErrorAnalyzer struct{}
 type RecommendationEngine struct{}
 type LearningPathEngine struct{}
 type LearningEventService struct{}
 type ProgressAnalyticsService struct{}
 
-func NewMasteryEngine(cfg *AdaptiveConfig) *MasteryEngine            { return &MasteryEngine{} }
-func NewDifficultyEngine(cfg *AdaptiveConfig) *DifficultyEngine      { return &DifficultyEngine{} }
-func NewPrerequisiteEngine(db *pgxpool.Pool) *PrerequisiteEngine     { return &PrerequisiteEngine{} }
-func NewErrorAnalyzer() *ErrorAnalyzer                                { return &ErrorAnalyzer{} }
-func NewRecommendationEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *RecommendationEngine {
-	return &RecommendationEngine{}
-}
-func NewLearningPathEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *LearningPathEngine {
-	return &LearningPathEngine{}
-}
-func NewLearningEventService(db *pgxpool.Pool) *LearningEventService { return &LearningEventService{} }
-func NewProgressAnalyticsService(db *pgxpool.Pool) *ProgressAnalyticsService {
-	return &ProgressAnalyticsService{}
-}
+func NewDifficultyEngine(cfg *AdaptiveConfig) *DifficultyEngine               { return &DifficultyEngine{} }
+func NewPrerequisiteEngine(db *pgxpool.Pool) *PrerequisiteEngine              { return &PrerequisiteEngine{} }
+func NewRecommendationEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *RecommendationEngine { return &RecommendationEngine{} }
+func NewLearningPathEngine(db *pgxpool.Pool, cfg *AdaptiveConfig) *LearningPathEngine     { return &LearningPathEngine{} }
+func NewLearningEventService(db *pgxpool.Pool) *LearningEventService          { return &LearningEventService{} }
+func NewProgressAnalyticsService(db *pgxpool.Pool) *ProgressAnalyticsService  { return &ProgressAnalyticsService{} }
 
 
