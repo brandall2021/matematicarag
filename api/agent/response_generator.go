@@ -15,15 +15,6 @@ func NewResponseGenerator(callLLM LLMFunc, cfg *AgentConfig) *ResponseGenerator 
 	return &ResponseGenerator{callLLM: callLLM, cfg: cfg}
 }
 
-type AgentResponse struct {
-	Message   string              `json:"message"`
-	Intent    IntentType          `json:"intent"`
-	Strategy  PedagogicalStrategy `json:"strategy,omitempty"`
-	Citations []map[string]any    `json:"citations,omitempty"`
-	Sections  map[string]string   `json:"sections,omitempty"`
-	Actions   []string            `json:"actions,omitempty"`
-}
-
 func (rg *ResponseGenerator) Generate(ctx context.Context, plan *Plan, toolResults []*ToolCall, query string, citationMgr *CitationManager) (*AgentResponse, error) {
 	var toolSummary strings.Builder
 	toolSummary.WriteString("Resultados de herramientas:\n")
@@ -44,7 +35,7 @@ func (rg *ResponseGenerator) Generate(ctx context.Context, plan *Plan, toolResul
 	}
 
 	resp := &AgentResponse{
-		Message:  response,
+		Response: response,
 		Intent:   plan.Intent,
 		Strategy: plan.Strategy,
 		Actions:  []string{string(plan.Intent)},
@@ -157,7 +148,7 @@ func (rg *ResponseGenerator) fallbackResponse(query string, toolResults []*ToolC
 	}
 
 	return &AgentResponse{
-		Message:   sb.String(),
+		Response:  sb.String(),
 		Intent:    plan.Intent,
 		Strategy:  plan.Strategy,
 		Citations: citationMgr.GetCitationsJSON(),
