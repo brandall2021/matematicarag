@@ -278,7 +278,8 @@ type PageMode = 'list' | 'taking' | 'results' | 'teacher-list' | 'create-form' |
         @if (studentAssessments().length === 0) {
           <div class="empty-state">
             <mat-icon>quiz</mat-icon>
-            <p>No hay evaluaciones publicadas disponibles</p>
+            <p>Todavía no hay evaluaciones publicadas</p>
+            <span class="empty-hint">Consultá con tu docente o volvé más tarde</span>
           </div>
         }
         @for (assessment of studentAssessments(); track assessment.id) {

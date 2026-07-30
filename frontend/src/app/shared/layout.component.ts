@@ -4,11 +4,12 @@ import { AuthService } from '../core/services/auth.service';
 import { ThemeService } from '../core/services/theme.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatButtonModule, MatIconModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatButtonModule, MatIconModule, MatTooltipModule],
   template: `
     <div class="layout">
       <button class="hamburger" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Toggle sidebar">
@@ -25,10 +26,10 @@ import { MatIconModule } from '@angular/material/icon';
 
         <nav class="sidebar-nav">
           <div class="nav-section-label">Principal</div>
-          <a routerLink="/chat" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>chat</mat-icon><span>Chat</span></a>
-          <a routerLink="/agente" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>smart_toy</mat-icon><span>Agente</span></a>
-          <a routerLink="/math" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>calculate</mat-icon><span>Matemática</span></a>
-          <a routerLink="/tutor" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>school</mat-icon><span>Tutor</span></a>
+          <a routerLink="/chat" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)" matTooltip="Consultá documentos y recibí respuestas con fuentes"><mat-icon>chat</mat-icon><span>Chat</span></a>
+          <a routerLink="/agente" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)" matTooltip="Analiza tu problema y guía tu aprendizaje paso a paso"><mat-icon>smart_toy</mat-icon><span>Agente</span></a>
+          <a routerLink="/math" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)" matTooltip="Operaciones simbólicas: derivar, integrar, simplificar"><mat-icon>calculate</mat-icon><span>Matemática</span></a>
+          <a routerLink="/tutor" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)" matTooltip="Ejercicios prácticos, verificación y ayuda paso a paso"><mat-icon>school</mat-icon><span>Tutor</span></a>
 
           <div class="nav-section-label">Contenido</div>
           <a routerLink="/documents" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>folder</mat-icon><span>Documentos</span></a>
@@ -57,10 +58,10 @@ import { MatIconModule } from '@angular/material/icon';
             <span class="user-name">{{ auth.currentUser()?.name || 'Usuario' }}</span>
           </div>
           <div class="footer-actions">
-            <button mat-icon-button (click)="themeService.toggle()" class="theme-btn" aria-label="Toggle theme">
+            <button mat-icon-button (click)="themeService.toggle()" class="theme-btn" aria-label="Cambiar tema" matTooltip="Cambiar tema">
               <mat-icon>{{ themeService.currentTheme() === 'dark' ? 'light_mode' : 'dark_mode' }}</mat-icon>
             </button>
-            <button mat-icon-button (click)="auth.logout()" aria-label="Logout">
+            <button mat-icon-button (click)="auth.logout()" aria-label="Cerrar sesión" matTooltip="Cerrar sesión">
               <mat-icon>logout</mat-icon>
             </button>
           </div>

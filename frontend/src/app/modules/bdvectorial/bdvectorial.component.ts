@@ -1,9 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 
 interface Doc {
@@ -49,10 +50,12 @@ interface Chunk {
       }
 
       <div class="actions-bar">
-        <button mat-raised-button color="warn" (click)="reindexAll()" [disabled]="reindexingAll() || docs().length === 0">
-          <mat-icon>{{ reindexingAll() ? 'sync' : 'refresh' }}</mat-icon>
-          {{ reindexingAll() ? 'Reindexando...' : 'Reindexar todo' }}
-        </button>
+        @if (auth.hasRole('ADMIN', 'TEACHER')) {
+          <button mat-raised-button color="warn" (click)="reindexAll()" [disabled]="reindexingAll() || docs().length === 0">
+            <mat-icon>{{ reindexingAll() ? 'sync' : 'refresh' }}</mat-icon>
+            {{ reindexingAll() ? 'Reindexando...' : 'Reindexar todo' }}
+          </button>
+        }
         <span class="doc-count">{{ docs().length }} documentos</span>
       </div>
 
@@ -84,9 +87,11 @@ interface Chunk {
                   }
                 </div>
               </div>
-              <button mat-icon-button class="reindex-btn" (click)="reindexDoc(doc, $event)" [disabled]="reindexingDoc() === doc.id" matTooltip="Reindexar">
-                <mat-icon [class.spin]="reindexingDoc() === doc.id">{{ reindexingDoc() === doc.id ? 'sync' : 'refresh' }}</mat-icon>
-              </button>
+              @if (auth.hasRole('ADMIN', 'TEACHER')) {
+                <button mat-icon-button class="reindex-btn" (click)="reindexDoc(doc, $event)" [disabled]="reindexingDoc() === doc.id" matTooltip="Reindexar">
+                  <mat-icon [class.spin]="reindexingDoc() === doc.id">{{ reindexingDoc() === doc.id ? 'sync' : 'refresh' }}</mat-icon>
+                </button>
+              }
               <mat-icon class="expand-icon">{{ expandedDoc() === doc.id ? 'expand_less' : 'expand_more' }}</mat-icon>
             </div>
 
@@ -193,6 +198,8 @@ export class BdvectorialComponent {
   reindexingAll = signal(false);
   reindexMsg = signal('');
   reindexOk = signal(false);
+
+  protected auth = inject(AuthService);
 
   constructor(private http: HttpClient) {
     this.loadDocs();

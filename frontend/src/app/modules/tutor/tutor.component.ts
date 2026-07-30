@@ -44,7 +44,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
           <div class="control-group">
             <label>Nivel</label>
             <mat-button-toggle-group [value]="level()" (change)="level.set($event.value)">
-              <mat-button-toggle value="basic">Basico</mat-button-toggle>
+              <mat-button-toggle value="basic">Básico</mat-button-toggle>
               <mat-button-toggle value="intermediate">Intermedio</mat-button-toggle>
               <mat-button-toggle value="advanced">Avanzado</mat-button-toggle>
             </mat-button-toggle-group>
@@ -53,7 +53,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
 
         <div class="input-section">
           <div class="mathfield-wrapper">
-            <label>Expresion matematica</label>
+            <label>Expresión matemática</label>
             <math-field
               #mathField
               virtual-keyboard-mode="auto"
@@ -87,7 +87,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
           @if (!sessionId()) {
             <button mat-raised-button color="primary" (click)="startSession()" [disabled]="loading()">
               <mat-icon>{{ loading() ? 'sync' : 'play_arrow' }}</mat-icon>
-              {{ loading() ? 'Iniciando...' : 'Iniciar Sesion' }}
+              {{ loading() ? 'Iniciando...' : 'Iniciar Sesión' }}
             </button>
           }
 

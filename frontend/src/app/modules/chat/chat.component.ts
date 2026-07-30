@@ -35,6 +35,30 @@ interface ChatMsg {
     <div class="chat-container">
       <div class="main-chat">
         <div class="messages">
+          @if (messages().length === 0) {
+            <div class="welcome-message">
+              <div class="welcome-icon"><mat-icon>auto_awesome</mat-icon></div>
+              <h2>Chat Matemático</h2>
+              <p>Hacé consultas sobre matemática con análisis de tus documentos de estudio.</p>
+              <div class="suggestions">
+                <button class="suggestion-chip" (click)="setExample('Derivar x^2 + 3x')">
+                  <mat-icon>calculate</mat-icon> Derivar x² + 3x
+                </button>
+                <button class="suggestion-chip" (click)="setExample('Explicar límites')">
+                  <mat-icon>menu_book</mat-icon> Explicar límites
+                </button>
+                <button class="suggestion-chip" (click)="setExample('Resolver integral de sen(x)')">
+                  <mat-icon>functions</mat-icon> Resolver ∫ sen(x) dx
+                </button>
+                <button class="suggestion-chip" (click)="setExample('¿Qué es una matriz?')">
+                  <mat-icon>school</mat-icon> ¿Qué es una matriz?
+                </button>
+                <button class="suggestion-chip" (click)="setExample('Factorizar x^2 - 5x + 6')">
+                  <mat-icon>pattern</mat-icon> Factorizar x² − 5x + 6
+                </button>
+              </div>
+            </div>
+          }
           @for (msg of messages(); track msg.id) {
             <div class="message" [class.user]="msg.role === 'USER'" [class.assistant]="msg.role === 'ASSISTANT'">
               <div class="message-content">{{ msg.content }}</div>
@@ -91,7 +115,7 @@ interface ChatMsg {
             (keydown.enter)="sendMessage()"
             (input)="onMathInput()"
             class="chat-mathfield"
-            placeholder="Escribi tu pregunta de matematica..."
+            placeholder="Escribí tu pregunta de matemática..."
           ></math-field>
           <button mat-raised-button color="primary" (click)="sendMessage()" [disabled]="!newMessage">Enviar</button>
         </div>
@@ -138,6 +162,14 @@ interface ChatMsg {
       background: var(--surface) !important;
       border-radius: var(--radius-md) !important;
     }
+    .welcome-message { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1.5rem; text-align: center; }
+    .welcome-icon mat-icon { font-size: 3rem; width: 3rem; height: 3rem; color: var(--accent); margin-bottom: 1rem; }
+    .welcome-message h2 { color: var(--accent); font-family: 'Newsreader', serif; margin: 0 0 0.5rem 0; font-size: 1.3rem; }
+    .welcome-message p { color: var(--text-secondary); max-width: 400px; margin: 0 0 1.5rem 0; font-size: 0.85rem; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; max-width: 450px; }
+    .suggestion-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.5rem 0.85rem; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+    .suggestion-chip:hover { border-color: var(--accent); color: var(--accent-text); background: var(--accent-muted); }
+    .suggestion-chip mat-icon { font-size: 16px; width: 16px; height: 16px; }
   `]
 })
 export class ChatComponent implements AfterViewInit, OnDestroy {
@@ -151,6 +183,13 @@ export class ChatComponent implements AfterViewInit, OnDestroy {
   private mf: any = null;
 
   constructor(private api: ApiService, private router: Router, private zone: NgZone) {}
+
+  setExample(text: string) {
+    this.newMessage = text;
+    if (this.mf) {
+      this.mf.value = text;
+    }
+  }
 
   ngAfterViewInit() {
     setTimeout(() => {

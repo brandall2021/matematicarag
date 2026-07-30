@@ -1,5 +1,6 @@
 import { Component, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { LearningService, StudentDashboard, ConceptMastery, AdaptiveRecommendation } from '../../core/services/learning.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,7 +9,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 @Component({
   selector: 'app-student-progress',
   standalone: true,
-  imports: [CommonModule, MatButtonModule, MatIconModule, MatProgressBarModule],
+  imports: [CommonModule, RouterLink, MatButtonModule, MatIconModule, MatProgressBarModule],
   template: `
     <div class="progress-container">
       <div class="progress-header">
@@ -16,11 +17,19 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
       </div>
 
       @if (loading()) {
-        <div class="loading-box"><mat-icon>sync</mat-icon> Cargando...</div>
+        <div class="loading-box"><mat-icon class="spin">sync</mat-icon> Cargando tu progreso...</div>
       }
 
-      @if (error()) {
-        <div class="error-box"><mat-icon>error</mat-icon> {{ error() }}</div>
+      @if (!dashboard() && !loading()) {
+        <div class="empty-state">
+          <mat-icon>trending_up</mat-icon>
+          <h3>Aún no hay datos de progreso</h3>
+          <p>Resolvé ejercicios en el Chat o el Tutor para ver tu avance acá.</p>
+          <div class="empty-actions">
+            <a routerLink="/chat" class="action-link"><mat-icon>chat</mat-icon> Ir al Chat</a>
+            <a routerLink="/tutor" class="action-link"><mat-icon>school</mat-icon> Ir al Tutor</a>
+          </div>
+        </div>
       }
 
       @if (dashboard()) {
@@ -36,7 +45,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
           </div>
           <div class="stat-card">
             <div class="stat-value">{{ (dashboard()!.sessions_summary.correct_rate * 100).toFixed(0) }}%</div>
-            <div class="stat-label">Precision</div>
+            <div class="stat-label">Precisión</div>
           </div>
           <div class="stat-card">
             <div class="stat-value">{{ dashboard()!.sessions_summary.study_time_hours.toFixed(1) }}h</div>
@@ -68,7 +77,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
               </div>
             }
             @if (masteryList().length === 0) {
-              <p class="empty-text">Aun no hay datos de dominio. Comienza a practicar!</p>
+              <p class="empty-text">Aún no hay datos de dominio. ¡Empezá a practicar!</p>
             }
           </div>
         </div>
@@ -102,15 +111,17 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     </div>
   `,
   styles: [`
-    .progress-container { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
-    .progress-header h1 { color: var(--accent); font-family: 'Newsreader', serif; margin: 0 0 1.5rem 0; display: flex; align-items: center; gap: 0.5rem; }
-    .progress-header h1 mat-icon { font-size: 28px; width: 28px; height: 28px; }
+    .progress-container { padding: 1.5rem; max-width: 900px; margin: 0 auto; overflow-wrap: break-word; }
+    @media (max-width: 480px) { .progress-container { padding: 1rem; } }
+    .progress-header h1 { color: var(--accent); font-family: 'Newsreader', serif; margin: 0 0 1.5rem 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.2rem; overflow-wrap: break-word; }
+    .progress-header h1 mat-icon { font-size: 26px; width: 26px; height: 26px; flex-shrink: 0; }
 
     .loading-box, .error-box { display: flex; align-items: center; gap: 0.5rem; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
     .loading-box { background: var(--surface); color: var(--text-secondary); }
     .error-box { background: rgba(244, 67, 54, 0.1); color: #ef5350; border: 1px solid rgba(244, 67, 54, 0.3); }
 
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    @media (max-width: 480px) { .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; } }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; text-align: center; }
     .stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
     .stat-label { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -121,13 +132,13 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     .rec-reason { display: block; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; }
 
     .section { margin-bottom: 1.5rem; }
-    .section h2 { color: var(--accent); font-size: 1rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.4rem; }
-    .section h2 mat-icon { font-size: 20px; width: 20px; height: 20px; }
+    .section h2 { color: var(--accent); font-size: 1rem; margin: 0 0 0.75rem 0; display: flex; align-items: center; gap: 0.4rem; overflow-wrap: break-word; }
+    .section h2 mat-icon { font-size: 20px; width: 20px; height: 20px; flex-shrink: 0; }
 
     .mastery-list { display: flex; flex-direction: column; gap: 0.75rem; }
     .mastery-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; }
-    .mastery-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
-    .mastery-name { font-weight: 600; font-size: 0.85rem; }
+    .mastery-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; gap: 0.5rem; }
+    .mastery-name { font-weight: 600; font-size: 0.85rem; overflow-wrap: break-word; word-break: break-word; flex: 1; min-width: 0; }
     .mastery-status { font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
     .mastery-status[data-status="mastered"] { background: rgba(76, 175, 80, 0.15); color: #4caf50; }
     .mastery-status[data-status="developing"] { background: rgba(255, 193, 7, 0.15); color: #ffc107; }
@@ -149,6 +160,16 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
     .rec-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.85rem; color: var(--text-secondary); }
 
     .empty-text { color: var(--text-secondary); font-size: 0.85rem; text-align: center; padding: 1rem; }
+    .empty-state { text-align: center; padding: 3rem 1.5rem; background: var(--surface); border-radius: 12px; border: 1px solid var(--border); }
+    .empty-state mat-icon { font-size: 3rem; width: 3rem; height: 3rem; color: var(--text-secondary); margin-bottom: 1rem; }
+    .empty-state h3 { color: var(--text); margin: 0 0 0.5rem 0; font-size: 1.1rem; }
+    .empty-state p { color: var(--text-secondary); font-size: 0.85rem; margin: 0 0 1.5rem 0; }
+    .empty-actions { display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap; }
+    .action-link { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.5rem 1rem; border-radius: 8px; background: var(--accent-muted); color: var(--accent-text); text-decoration: none; font-size: 0.85rem; font-weight: 600; transition: all 0.15s; }
+    .action-link:hover { background: var(--accent); color: var(--bg); }
+    .action-link mat-icon { font-size: 18px; width: 18px; height: 18px; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })
 export class StudentProgressComponent implements OnInit {

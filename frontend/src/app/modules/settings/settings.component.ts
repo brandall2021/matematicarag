@@ -27,7 +27,7 @@ interface Setting {
   imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule],
   template: `
     <div class="settings-container">
-      <h1>Configuracion</h1>
+      <h1>Configuración</h1>
 
       <div class="tabs">
         <button [class.active]="tab() === 'users'" (click)="tab.set('users')"><mat-icon>people</mat-icon> Usuarios</button>
@@ -37,7 +37,7 @@ interface Setting {
       @if (tab() === 'users') {
         <div class="section">
           <div class="section-header">
-            <h2>Gestion de Usuarios</h2>
+            <h2>Gestión de Usuarios</h2>
             <button mat-raised-button color="primary" (click)="showCreate.set(!showCreate())">
               <mat-icon>add</mat-icon> Crear usuario
             </button>
@@ -91,7 +91,7 @@ interface Setting {
             <div>
               <button mat-stroked-button (click)="verifyOpenAI()" [disabled]="verifying()">
                 <mat-icon>{{ verifying() ? 'sync' : 'wifi_tethering' }}</mat-icon>
-                {{ verifying() ? 'Verificando...' : 'Verificar conexion' }}
+                {{ verifying() ? 'Verificando...' : 'Verificar conexión' }}
               </button>
               <button mat-raised-button color="primary" (click)="showNewKey.set(!showNewKey())" style="margin-left: 0.5rem">
                 <mat-icon>add</mat-icon> Agregar key
@@ -102,7 +102,7 @@ interface Setting {
           @if (verifyResult()) {
             <div class="verify-result" [class.error]="!verifyOk()">
               @if (verifyOk()) {
-                <mat-icon>check_circle</mat-icon> Conexion exitosa ({{ verifyResult() }})
+                <mat-icon>check_circle</mat-icon> Conexión exitosa ({{ verifyResult() }})
               } @else {
                 <mat-icon>error</mat-icon> {{ verifyResult() }}
               }
@@ -143,30 +143,30 @@ interface Setting {
             </div>
             <div class="prompt-card">
               <button mat-raised-button color="primary" (click)="saveAIConfig()">
-                <mat-icon>save</mat-icon> Guardar configuracion IA
+                <mat-icon>save</mat-icon> Guardar configuración IA
               </button>
             </div>
 
             <h3>Prompts del Sistema</h3>
             <div class="prompt-card">
               <label>Prompt del Chat</label>
-              <textarea [(ngModel)]="chatSystemPrompt" placeholder="Sos un tutor de matematicas de la UNT..." rows="5" class="form-textarea"></textarea>
+              <textarea [(ngModel)]="chatSystemPrompt" placeholder="Sos un tutor de matemáticas de la UNT..." rows="5" class="form-textarea"></textarea>
               <small class="model-hint">Se usa para las conversaciones de chat.</small>
               <button mat-raised-button color="primary" (click)="savePrompt('CHAT_SYSTEM_PROMPT', chatSystemPrompt)" style="margin-top: 0.5rem">
                 <mat-icon>save</mat-icon> Guardar prompt chat
               </button>
             </div>
             <div class="prompt-card">
-              <label>Prompt de Matematica</label>
-              <textarea [(ngModel)]="mathSystemPrompt" placeholder="Sos un experto en matematicas..." rows="5" class="form-textarea"></textarea>
+              <label>Prompt de Matemática</label>
+              <textarea [(ngModel)]="mathSystemPrompt" placeholder="Sos un experto en matemáticas..." rows="5" class="form-textarea"></textarea>
               <small class="model-hint">Se usa para las operaciones matematicas (evaluar, derivar, integrar, etc).</small>
               <button mat-raised-button color="primary" (click)="savePrompt('MATH_SYSTEM_PROMPT', mathSystemPrompt)" style="margin-top: 0.5rem">
-                <mat-icon>save</mat-icon> Guardar prompt matematica
+                <mat-icon>save</mat-icon> Guardar prompt matemática
               </button>
             </div>
             <div class="prompt-card">
               <label>Prompt RAG (Documentos)</label>
-              <textarea [(ngModel)]="ragSystemPrompt" placeholder="Sos un tutor de matematicas. Cita tus fuentes..." rows="5" class="form-textarea"></textarea>
+              <textarea [(ngModel)]="ragSystemPrompt" placeholder="Sos un tutor de matemáticas. Cita tus fuentes..." rows="5" class="form-textarea"></textarea>
               <small class="model-hint">Se usa para consultas RAG con documentos indexados. Define como citar fuentes.</small>
               <button mat-raised-button color="primary" (click)="savePrompt('RAG_SYSTEM_PROMPT', ragSystemPrompt)" style="margin-top: 0.5rem">
                 <mat-icon>save</mat-icon> Guardar prompt RAG
@@ -318,7 +318,7 @@ export class SettingsComponent implements OnInit {
       this.saveSettingDirect('AI_PROVIDER', this.aiProvider, 'AI provider'),
       this.saveSettingDirect('AI_MODEL', this.aiModel, 'AI model'),
       this.saveSettingDirect('AI_API_KEY_NAME', keyName, 'API key setting name')
-    ]).then(() => this.showMessage('Configuracion IA guardada'));
+    ]).then(() => this.showMessage('Configuración IA guardada'));
   }
 
   private saveSettingDirect(key: string, value: string, description: string): Promise<any> {
@@ -360,6 +360,7 @@ export class SettingsComponent implements OnInit {
         }
       },
       error: () => this.showMessage('Error al cargar configuraciones', 'error')
+
     });
   }
 
@@ -378,7 +379,7 @@ export class SettingsComponent implements OnInit {
       error: (err) => {
         this.verifying.set(false);
         this.verifyOk.set(false);
-        this.verifyResult.set(err.error?.error || 'Error de conexion');
+        this.verifyResult.set(err.error?.error || 'Error de conexión');
       }
     });
   }
@@ -414,6 +415,8 @@ export class SettingsComponent implements OnInit {
   }
 
   updateRole(userId: string, newRole: string) {
+    const roleLabel: Record<string, string> = { STUDENT: 'Alumno', TEACHER: 'Profesor', ADMIN: 'Administrador' };
+    if (!confirm(`¿Cambiar el rol a "${roleLabel[newRole] || newRole}"?`)) return;
     this.http.put(`${environment.apiUrl}/api/users/${userId}/role`, { role: newRole }).subscribe({
       next: () => { this.loadUsers(); this.showMessage('Rol actualizado'); },
       error: () => this.showMessage('Error al actualizar rol', 'error')

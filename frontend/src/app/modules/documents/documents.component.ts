@@ -1,8 +1,9 @@
-import { Component, signal, OnDestroy } from '@angular/core';
+import { Component, signal, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 
 interface Doc {
@@ -30,21 +31,23 @@ interface Chunk {
   imports: [CommonModule, MatButtonModule, MatIconModule],
   template: `
     <div class="container">
-      <h1>Gestion Documental</h1>
-      <p class="subtitle">Subi material de estudio (PDF, DOCX, TXT, Markdown) para indexarlo en la base vectorial</p>
+      <h1>Gestión Documental</h1>
+      <p class="subtitle">Subí material de estudio (PDF, DOCX, TXT, Markdown) para indexarlo en la base vectorial</p>
 
-      <div class="upload-area"
-           (dragover)="$event.preventDefault(); dragActive = true"
-           (dragleave)="dragActive = false"
-           (drop)="onDrop($event)"
-           [class.drag-active]="dragActive">
-        <input #fileInput type="file" accept=".pdf,.docx,.txt,.md" (change)="onFileSelect($event)" hidden>
-        <mat-icon class="upload-icon">cloud_upload</mat-icon>
-        <p>Arrastra un archivo aqui o</p>
-        <button mat-raised-button color="primary" (click)="fileInput.click()">
-          <mat-icon>add</mat-icon> Seleccionar archivo
-        </button>
-      </div>
+      @if (auth.hasRole('ADMIN', 'TEACHER')) {
+        <div class="upload-area"
+             (dragover)="$event.preventDefault(); dragActive = true"
+             (dragleave)="dragActive = false"
+             (drop)="onDrop($event)"
+             [class.drag-active]="dragActive">
+          <input #fileInput type="file" accept=".pdf,.docx,.txt,.md" (change)="onFileSelect($event)" hidden>
+          <mat-icon class="upload-icon">cloud_upload</mat-icon>
+          <p>Arrastrá un archivo acá o</p>
+          <button mat-raised-button color="primary" (click)="fileInput.click()">
+            <mat-icon>add</mat-icon> Seleccionar archivo
+          </button>
+        </div>
+      }
 
       @if (uploading()) {
         <div class="upload-progress">
@@ -95,9 +98,11 @@ interface Chunk {
                   <mat-icon>visibility</mat-icon> Ver chunks
                 </button>
               }
-              <button mat-icon-button color="warn" (click)="deleteDoc(doc)">
-                <mat-icon>delete</mat-icon>
-              </button>
+              @if (auth.hasRole('ADMIN', 'TEACHER')) {
+                <button mat-icon-button color="warn" (click)="deleteDoc(doc)" aria-label="Eliminar documento">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
             </div>
           </div>
         }
@@ -185,6 +190,8 @@ export class DocumentsComponent implements OnDestroy {
   dragActive = false;
 
   private pollTimer: any = null;
+
+  protected auth = inject(AuthService);
 
   constructor(private http: HttpClient) {
     this.loadDocs();
