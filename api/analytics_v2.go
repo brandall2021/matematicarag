@@ -38,6 +38,21 @@ type CourseAnalyticsData struct {
 
 func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	return func(r chi.Router) {
+		r.Get("/student/current", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			courseID := r.URL.Query().Get("course_id")
+			if courseID == "" {
+				courseID = "matematica-1"
+			}
+			analytics, err := GetStudentAnalytics(db, studentID, courseID)
+			if err != nil {
+				http.Error(w, `{"error":"no analytics found"}`, http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(analytics)
+		})
+
 		r.Get("/student/{studentID}", func(w http.ResponseWriter, r *http.Request) {
 			studentID := chi.URLParam(r, "studentID")
 			courseID := r.URL.Query().Get("course_id")
@@ -121,11 +136,12 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 				SELECT
 					c.id AS concept_id,
 					c.name,
-					COUNT(DISTINCT sa.student_id) AS total_students,
+					COUNT(DISTINCT sas.student_id) AS total_students,
 					COALESCE(AVG(CASE WHEN sa.is_correct THEN 1.0 ELSE 0.0 END), 0) AS success_rate
 				FROM concepts c
 				LEFT JOIN question_bank qb ON qb.concept_id = c.id
 				LEFT JOIN student_answers sa ON sa.question_id = qb.id
+				LEFT JOIN student_assessments sas ON sa.student_assessment_id = sas.id
 				WHERE c.course_id = $1
 				GROUP BY c.id, c.name
 				ORDER BY c.name`, courseID)
@@ -167,10 +183,11 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 					c.name AS concept_name,
 					qb.statement AS question,
 					COUNT(*) AS error_count,
-					COUNT(DISTINCT sa.student_id) AS affected_students
+					COUNT(DISTINCT sas.student_id) AS affected_students
 				FROM student_answers sa
 				JOIN question_bank qb ON sa.question_id = qb.id
 				JOIN concepts c ON qb.concept_id = c.id
+				JOIN student_assessments sas ON sa.student_assessment_id = sas.id
 				WHERE sa.is_correct = FALSE AND c.course_id = $1
 				GROUP BY c.id, c.name, qb.statement
 				HAVING COUNT(*) > 2
