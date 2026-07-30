@@ -77,6 +77,12 @@ func init() {
 	os.MkdirAll(uploadDir, 0755)
 }
 
+func sanitizeText(text string) string {
+	text = strings.ReplaceAll(text, "\x00", "")
+	text = strings.ToValidUTF8(text, "")
+	return text
+}
+
 func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Use(AuthMiddleware(cfg.JWTSecret))
@@ -232,6 +238,7 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 
 	// Insert chunks into document_chunks for text search
 	for i, chunk := range chunks {
+		chunk.Text = sanitizeText(chunk.Text)
 		_, err := db.Exec(ctx,
 			`INSERT INTO document_chunks (document_id, chunk_index, content, page, section, topic, content_type, has_formula, has_example, has_exercise, has_solution)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,

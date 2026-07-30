@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	qdrantURL    = "http://sistemas-qdrant-gjlncs-qdrant-1:6333"
+	qdrantURL    = "http://qdrant:6333"
 	qdrantAPIKey = ""
 	collection   = "matematica_chunks"
 	qdrantClient = &http.Client{Timeout: 30 * time.Second}
@@ -22,6 +22,15 @@ var (
 func init() {
 	if v := os.Getenv("QDRANT_URL"); v != "" {
 		qdrantURL = v
+	} else {
+		host := os.Getenv("QDRANT_HOST")
+		port := os.Getenv("QDRANT_PORT")
+		if host != "" {
+			if port == "" {
+				port = "6333"
+			}
+			qdrantURL = fmt.Sprintf("http://%s:%s", host, port)
+		}
 	}
 	if v := os.Getenv("QDRANT_API_KEY"); v != "" {
 		qdrantAPIKey = v
