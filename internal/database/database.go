@@ -150,6 +150,8 @@ func Migrate(db *pgxpool.Pool) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_concepts_course ON concepts(course_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_concept_prereq ON concept_prerequisites(prerequisite_id)`,
+		`ALTER TABLE concepts ADD COLUMN IF NOT EXISTS code VARCHAR(100)`,
+		`UPDATE concepts SET code = id WHERE code IS NULL`,
 
 		// Student Learning Profile
 		`CREATE TABLE IF NOT EXISTS student_profiles (

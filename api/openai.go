@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -124,6 +125,8 @@ func callOpenAICompatible(provider, apiKey, model, systemPrompt, userMessage str
 	})
 }
 
+var llmHTTPClient = &http.Client{Timeout: 60 * time.Second}
+
 func callOpenAICompatibleWithMessages(provider, apiKey, model string, messages []OpenAIMessage) (string, error) {
 	var baseURL string
 	switch provider {
@@ -146,14 +149,17 @@ func callOpenAICompatibleWithMessages(provider, apiKey, model string, messages [
 		return "", err
 	}
 
-	req, err := http.NewRequest("POST", baseURL, bytes.NewReader(body))
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := llmHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("error calling %s: %v", provider, err)
 	}
@@ -221,7 +227,7 @@ func callAnthropicWithMessages(apiKey, model string, messages []OpenAIMessage) (
 	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("anthropic-version", "2023-06-01")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := llmHTTPClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("error calling Anthropic: %v", err)
 	}
