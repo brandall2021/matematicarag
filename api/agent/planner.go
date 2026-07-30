@@ -50,6 +50,7 @@ func (p *Planner) toolPurpose(tool string) string {
 		"rag_search":        "buscar material académico relevante",
 		"math_solve":        "resolver expresión matemática",
 		"math_verify":       "verificar respuesta del estudiante",
+		"math_evaluate":     "evaluar respuesta con análisis detallado",
 		"student_profile":   "consultar perfil del estudiante",
 		"exercise_generate": "generar ejercicio",
 		"grade_answer":      "evaluar respuesta",
@@ -87,6 +88,12 @@ func (p *Planner) buildInput(tool string, query string, studentCtx *StudentConte
 		input["expression"] = query
 	case "math_verify":
 		input["operation"] = "derivative"
+	case "math_evaluate":
+		input["expression"] = query
+		if studentCtx != nil {
+			input["student_id"] = studentCtx.StudentID
+			input["concept_id"] = studentCtx.CurrentTopic
+		}
 	}
 	return input
 }

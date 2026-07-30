@@ -19,7 +19,7 @@ func (de *DecisionEngine) SelectTools(ctx context.Context, intent IntentType, st
 	case IntentSolveExercise:
 		return []string{"math_solve", "rag_search"}
 	case IntentCheckAnswer, IntentCheckProcedure:
-		return []string{"math_verify", "student_profile", "rag_search"}
+		return []string{"math_evaluate", "student_profile", "rag_search"}
 	case IntentGenerateExercise:
 		return []string{"student_profile", "exercise_generate"}
 	case IntentPractice:

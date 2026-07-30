@@ -69,6 +69,7 @@ func RegisterAllTools(tr *ToolRegistry, deps *ToolDependencies) {
 	tr.Register(NewGradingTool(deps.GradeFn))
 	tr.Register(NewHintTool())
 	tr.Register(NewAssessmentTool())
+	tr.Register(NewEvaluateTool(deps.EvaluateFn))
 }
 
 type ToolDependencies struct {
@@ -79,6 +80,7 @@ type ToolDependencies struct {
 	StudentProfileFn   func(ctx context.Context, studentID, courseID string) (map[string]any, error)
 	ExerciseGenerateFn func(ctx context.Context, concept string, difficulty int, studentID string) (map[string]any, error)
 	GradeFn           func(ctx context.Context, studentAnswer, expectedAnswer string) (map[string]any, error)
+	EvaluateFn        func(ctx context.Context, expression, expected, conceptID, studentID string, steps []map[string]any) (map[string]any, error)
 	AdaptiveEngine    *adaptive.AdaptiveEngine
 }
 
