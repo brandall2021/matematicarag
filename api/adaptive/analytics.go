@@ -134,11 +134,11 @@ func (s *ProgressAnalyticsService) GetCourseAnalytics(ctx context.Context, cours
 	}
 
 	rows, err := s.db.Query(ctx,
-		`SELECT c.code, c.name, COALESCE(AVG(cm.mastery), 0) as avg_mastery
+		`SELECT c.id, c.name, COALESCE(AVG(cm.mastery), 0) as avg_mastery
 		 FROM concepts c
 		 LEFT JOIN concept_mastery cm ON cm.concept_id = c.id
 		 WHERE c.course_id = $1
-		 GROUP BY c.code, c.name
+		 GROUP BY c.id, c.name
 		 ORDER BY avg_mastery ASC`, courseID)
 	if err != nil {
 		return nil, err

@@ -64,13 +64,16 @@ func (e *RecommendationEngine) ExplainRecommendation(rec *Recommendation) string
 
 func (e *RecommendationEngine) weakConcepts(ctx context.Context, studentID, courseID string) ([]MasteryRecord, error) {
 	rows, err := e.db.Query(ctx,
-		`SELECT concept_id, mastery, status, attempts, correct, incorrect, hints_used,
-		        independent_successes, average_time_seconds, confidence,
-		        last_attempt_at, last_success_at, last_error_at,
-		        next_review_at, created_at, updated_at
-		 FROM concept_mastery
-		 WHERE student_id = $1 AND course_id = $2 AND mastery < $3
-		 ORDER BY mastery ASC`, studentID, courseID, e.config.BeginnerThreshold)
+		`SELECT cm.concept_id, cm.mastery, cm.status, cm.attempts, cm.correct,
+		        COALESCE(cm.incorrect, 0), cm.hints_used,
+		        COALESCE(cm.independent_successes, 0), COALESCE(cm.average_time_seconds, 0),
+		        COALESCE(cm.confidence, 1.0),
+		        cm.last_attempt_at, cm.last_success_at, cm.last_error_at,
+		        cm.next_review_at, cm.created_at, cm.updated_at, c.course_id
+		 FROM concept_mastery cm
+		 JOIN concepts c ON cm.concept_id = c.id
+		 WHERE cm.student_id = $1 AND c.course_id = $2 AND cm.mastery < $3
+		 ORDER BY cm.mastery ASC`, studentID, courseID, e.config.BeginnerThreshold)
 	if err != nil {
 		return nil, err
 	}
@@ -80,10 +83,10 @@ func (e *RecommendationEngine) weakConcepts(ctx context.Context, studentID, cour
 	for rows.Next() {
 		var r MasteryRecord
 		if err := rows.Scan(
-			&r.StudentID, &r.ConceptID, &r.Mastery, &r.Status, &r.Attempts,
-			&r.Correct, &r.Incorrect, &r.HintsUsed, &r.IndependentSuccesses,
-			&r.AvgTimeSecs, &r.Confidence, &r.LastAttemptAt, &r.LastSuccessAt,
-			&r.LastErrorAt, &r.NextReviewAt, &r.CreatedAt, &r.UpdatedAt,
+			&r.ConceptID, &r.Mastery, &r.Status, &r.Attempts, &r.Correct,
+			&r.Incorrect, &r.HintsUsed, &r.IndependentSuccesses, &r.AvgTimeSecs,
+			&r.Confidence, &r.LastAttemptAt, &r.LastSuccessAt, &r.LastErrorAt,
+			&r.NextReviewAt, &r.CreatedAt, &r.UpdatedAt, &r.CourseID,
 		); err != nil {
 			continue
 		}
@@ -169,7 +172,7 @@ func (e *RecommendationEngine) nextConcept(ctx context.Context, studentID, cours
 		 WHERE c.course_id = $1
 		 AND c.id NOT IN (
 		   SELECT cm.concept_id FROM concept_mastery cm
-		   WHERE cm.student_id = $2 AND cm.course_id = $1 AND cm.mastery >= $3
+		   WHERE cm.student_id = $2 AND cm.mastery >= $3
 		 )
 		 ORDER BY c.difficulty_base ASC
 		 LIMIT 1`, courseID, studentID, e.config.CompetentThreshold)

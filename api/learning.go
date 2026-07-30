@@ -47,6 +47,37 @@ type StudentError struct {
 func LearningRoutes(db *pgxpool.Pool, adaptEngine *adaptive.AdaptiveEngine) func(r chi.Router) {
 	return func(r chi.Router) {
 
+		r.Get("/profile", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			profile, err := GetOrCreateProfile(db, studentID, "matematica-1")
+			if err != nil {
+				http.Error(w, `{"error":"failed to load profile"}`, http.StatusInternalServerError)
+				return
+			}
+			mastery, err := GetMasteryMap(db, studentID, "matematica-1")
+			if err != nil {
+				http.Error(w, `{"error":"failed to load mastery"}`, http.StatusInternalServerError)
+				return
+			}
+			totalExercises := 0
+			totalMastery := 0.0
+			for _, m := range mastery {
+				totalExercises += m.Attempts
+				totalMastery += m.Mastery
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"student_id":       profile.StudentID,
+				"overall_mastery":  profile.OverallLevel,
+				"total_attempts":   profile.TotalAttempts,
+				"correct_attempts": profile.CorrectAttempts,
+				"total_exercises":  totalExercises,
+				"total_hints":      profile.TotalHintsUsed,
+				"study_time":       profile.StudyTimeSeconds,
+				"mastery":          mastery,
+			})
+		})
+
 		r.Get("/progress", func(w http.ResponseWriter, r *http.Request) {
 			studentID := r.Context().Value(UserIDKey).(string)
 			profile, err := GetOrCreateProfile(db, studentID, "matematica-1")
