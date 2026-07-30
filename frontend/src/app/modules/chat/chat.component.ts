@@ -1,10 +1,13 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, AfterViewInit, OnDestroy, NgZone, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MathfieldElement } from 'mathlive';
+
+MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0/fonts';
 
 interface RagSource {
   id: string;
@@ -27,6 +30,7 @@ interface ChatMsg {
   selector: 'app-chat',
   standalone: true,
   imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <div class="chat-container">
       <div class="main-chat">
@@ -78,7 +82,17 @@ interface ChatMsg {
           }
         </div>
         <div class="input-area">
-          <input [(ngModel)]="newMessage" (keydown.enter)="sendMessage()" placeholder="Escribi tu pregunta de matematica..." class="chat-input">
+          <math-field
+            #mathField
+            id="chat-mathfield"
+            virtual-keyboard-mode="auto"
+            smart-fence
+            smart-superscript
+            (keydown.enter)="sendMessage()"
+            (input)="onMathInput()"
+            class="chat-mathfield"
+            placeholder="Escribi tu pregunta de matematica..."
+          ></math-field>
           <button mat-raised-button color="primary" (click)="sendMessage()" [disabled]="!newMessage">Enviar</button>
         </div>
       </div>
@@ -109,18 +123,62 @@ interface ChatMsg {
     .citation-card-header { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; }
     .citation-score { margin-left: auto; font-weight: 700; font-size: 12px; }
     .citation-card-content { font-size: 12px; color: var(--text-secondary); line-height: 1.5; font-style: italic; }
-    .input-area { padding: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); }
-    .chat-input { flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 1rem; outline: none; }
-    .chat-input:focus { border-color: var(--accent); }
+    .input-area { padding: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); align-items: center; }
+    .chat-mathfield { flex: 1; min-height: 48px; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); font-size: 1.1rem; }
+    .input-area:focus-within .chat-mathfield { border-color: var(--accent); }
+    :host ::ng-deep #chat-mathfield {
+      --math-field-border: none;
+      --math-field-border-radius: 0;
+      --math-field-background: transparent;
+      --math-field-color: var(--text);
+      --math-field-placeholder-color: var(--text-secondary);
+      font-size: 1.1rem;
+    }
+    :host ::ng-deep .ML__virtual-keyboard {
+      background: var(--surface) !important;
+    }
   `]
 })
-export class ChatComponent {
+export class ChatComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('mathField') mathFieldRef!: ElementRef<any>;
+
   messages = signal<ChatMsg[]>([]);
   currentSessionId = signal<string>('');
   newMessage = '';
   expandedCitation: string | null = null;
 
-  constructor(private api: ApiService, private router: Router) {}
+  private mf: any = null;
+
+  constructor(private api: ApiService, private router: Router, private zone: NgZone) {}
+
+  ngAfterViewInit() {
+    setTimeout(() => {
+      this.mf = this.mathFieldRef?.nativeElement;
+      if (this.mf) {
+        this.mf.addEventListener('input', this.handleInput);
+      }
+    }, 100);
+  }
+
+  ngOnDestroy() {
+    if (this.mf) {
+      this.mf.removeEventListener('input', this.handleInput);
+    }
+  }
+
+  private handleInput = () => {
+    this.zone.run(() => {
+      if (this.mf) {
+        this.newMessage = this.mf.value || '';
+      }
+    });
+  };
+
+  onMathInput() {
+    if (this.mf) {
+      this.newMessage = this.mf.value || '';
+    }
+  }
 
   toggleCitation(id: string) {
     this.expandedCitation = this.expandedCitation === id ? null : id;
@@ -136,6 +194,9 @@ export class ChatComponent {
     if (!this.newMessage) return;
     const msg = this.newMessage;
     this.newMessage = '';
+    if (this.mf) {
+      this.mf.value = '';
+    }
     this.messages.update(msgs => [...msgs, { id: 'temp-user', role: 'USER', content: msg }]);
     this.api.chat(msg, this.currentSessionId()).subscribe(res => {
       const assistantMsg: ChatMsg = {

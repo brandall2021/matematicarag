@@ -1,10 +1,13 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, AfterViewInit, OnDestroy, NgZone, CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MathfieldElement } from 'mathlive';
+
+MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0/fonts';
 
 interface AgentToolCall {
   tool_name: string;
@@ -46,6 +49,7 @@ type Phase = 'idle' | 'thinking' | 'done';
   selector: 'app-agent-chat',
   standalone: true,
   imports: [CommonModule, FormsModule, MatButtonModule, MatIconModule],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   template: `
     <div class="agent-container">
       <div class="agent-header">
@@ -192,7 +196,18 @@ type Phase = 'idle' | 'thinking' | 'done';
       </div>
 
       <div class="input-area">
-        <input [(ngModel)]="newMessage" (keydown.enter)="sendMessage()" placeholder="Preguntale al agente..." class="agent-input" [disabled]="phase() === 'thinking'">
+        <math-field
+          #mathField
+          id="agent-mathfield"
+          virtual-keyboard-mode="auto"
+          smart-fence
+          smart-superscript
+          (keydown.enter)="sendMessage()"
+          (input)="onMathInput()"
+          class="agent-mathfield"
+          placeholder="Preguntale al agente..."
+          [attr.disabled]="phase() === 'thinking' ? true : null"
+        ></math-field>
         <button mat-raised-button color="primary" (click)="sendMessage()" [disabled]="!newMessage || phase() === 'thinking'">
           <mat-icon>send</mat-icon>
         </button>
@@ -263,13 +278,25 @@ type Phase = 'idle' | 'thinking' | 'done';
     .dot:nth-child(2) { animation-delay: 0.2s; }
     .dot:nth-child(3) { animation-delay: 0.4s; }
     @keyframes pulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.1); } }
-    .input-area { padding: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); }
-    .agent-input { flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 1rem; outline: none; }
-    .agent-input:focus { border-color: var(--accent); }
+    .input-area { padding: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); align-items: center; }
+    .agent-mathfield { flex: 1; min-height: 48px; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); font-size: 1.1rem; }
+    .input-area:focus-within .agent-mathfield { border-color: var(--accent); }
+    :host ::ng-deep #agent-mathfield {
+      --math-field-border: none;
+      --math-field-border-radius: 0;
+      --math-field-background: transparent;
+      --math-field-color: var(--text);
+      --math-field-placeholder-color: var(--text-secondary);
+      font-size: 1.1rem;
+    }
+    :host ::ng-deep .ML__virtual-keyboard {
+      background: var(--surface) !important;
+    }
     .input-area button mat-icon { font-size: 18px; }
   `]
 })
-export class AgentChatComponent {
+export class AgentChatComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('mathField') mathFieldRef!: ElementRef<any>;
   messages = signal<AgentMsg[]>([]);
   sessionId = signal<string>('');
   phase = signal<Phase>('idle');
@@ -283,7 +310,38 @@ export class AgentChatComponent {
     'Tenemos ejercicios de límites?',
   ];
 
-  constructor(private api: ApiService, private router: Router) {}
+  private mf: any = null;
+
+  constructor(private api: ApiService, private router: Router, private zone: NgZone) {}
+
+  ngAfterViewInit() {
+    setTimeout(() => {
+      this.mf = this.mathFieldRef?.nativeElement;
+      if (this.mf) {
+        this.mf.addEventListener('input', this.handleInput);
+      }
+    }, 100);
+  }
+
+  ngOnDestroy() {
+    if (this.mf) {
+      this.mf.removeEventListener('input', this.handleInput);
+    }
+  }
+
+  private handleInput = () => {
+    this.zone.run(() => {
+      if (this.mf) {
+        this.newMessage = this.mf.value || '';
+      }
+    });
+  };
+
+  onMathInput() {
+    if (this.mf) {
+      this.newMessage = this.mf.value || '';
+    }
+  }
 
   confidenceColor(score: number): string {
     if (score >= 0.9) return '#4caf50';
@@ -297,6 +355,9 @@ export class AgentChatComponent {
 
   sendSuggestion(text: string) {
     this.newMessage = text;
+    if (this.mf) {
+      this.mf.value = text;
+    }
     this.sendMessage();
   }
 
@@ -304,6 +365,9 @@ export class AgentChatComponent {
     if (!this.newMessage || this.phase() === 'thinking') return;
     const query = this.newMessage;
     this.newMessage = '';
+    if (this.mf) {
+      this.mf.value = '';
+    }
     this.phase.set('thinking');
     this.messages.update(msgs => [...msgs, { id: 'temp-user', role: 'USER', content: query }]);
     this.api.agentChat(query, this.sessionId()).subscribe({
