@@ -94,6 +94,7 @@ func main() {
 		r.Group(func(r chi.Router) {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
 			r.Route("/student", api.StudentRoutes(db))
+			r.Route("/dashboard/student", api.StudentDashboardRoutes(db))
 			r.Route("/history", api.HistoryRoutes(db))
 			r.Route("/users", api.UserRoutes(db))
 			r.Route("/learning", api.LearningRoutes(db, adaptEngine))
@@ -121,6 +122,7 @@ func main() {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
 			r.Use(api.RoleMiddleware("TEACHER", "ADMIN"))
 			r.Route("/teacher", api.TeacherRoutes(db))
+			r.Route("/dashboard/teacher", api.TeacherDashboardRoutes(db))
 		})
 
 		r.Group(func(r chi.Router) {
