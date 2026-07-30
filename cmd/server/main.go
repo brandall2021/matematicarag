@@ -122,6 +122,7 @@ func main() {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
 			r.Use(api.RoleMiddleware("TEACHER", "ADMIN"))
 			r.Route("/teacher", api.TeacherRoutes(db))
+			r.Route("/teacher/critical-concepts", api.CriticalConceptsRoutes(db))
 			r.Route("/dashboard/teacher", api.TeacherDashboardRoutes(db))
 		})
 
