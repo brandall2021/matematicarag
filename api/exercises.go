@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strings"
 
@@ -31,6 +32,24 @@ type Exercise struct {
 
 func ExerciseRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	return func(r chi.Router) {
+		r.Get("/next", func(w http.ResponseWriter, r *http.Request) {
+			studentID := r.Context().Value(UserIDKey).(string)
+			courseID := r.URL.Query().Get("course_id")
+			if courseID == "" {
+				courseID = "matematica-1"
+			}
+			ex, reason, err := GetNextExercise(r.Context(), db, cfg, studentID, courseID)
+			if err != nil {
+				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"exercise": ex,
+				"reason":   reason,
+			})
+		})
+
 		r.Post("/generate", func(w http.ResponseWriter, r *http.Request) {
 			var req struct {
 				ConceptID  string `json:"concept_id"`
@@ -90,6 +109,50 @@ func ExerciseRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 		})
 
+		r.Get("/{exerciseID}", func(w http.ResponseWriter, r *http.Request) {
+			exerciseID := chi.URLParam(r, "exerciseID")
+			var ex Exercise
+			err := db.QueryRow(r.Context(),
+				`SELECT id, concept_id, difficulty, statement, latex, expected_answer, solution, solution_steps, hints, common_errors, source, verified_by_math
+				 FROM exercises WHERE id = $1`, exerciseID,
+			).Scan(&ex.ID, &ex.ConceptID, &ex.Difficulty, &ex.Statement, &ex.Latex, &ex.ExpectedAnswer, &ex.Solution, &ex.SolutionSteps, &ex.Hints, &ex.CommonErrors, &ex.Source, &ex.VerifiedByMath)
+			if err != nil {
+				http.Error(w, `{"error":"exercise not found"}`, http.StatusNotFound)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(ex)
+		})
+
+		r.Post("/{exerciseID}/validate", func(w http.ResponseWriter, r *http.Request) {
+			exerciseID := chi.URLParam(r, "exerciseID")
+			mathClient := NewMathClient(cfg)
+			var ex Exercise
+			err := db.QueryRow(r.Context(),
+				`SELECT id, concept_id, difficulty, statement, latex, expected_answer, solution, source, verified_by_math
+				 FROM exercises WHERE id = $1`, exerciseID,
+			).Scan(&ex.ID, &ex.ConceptID, &ex.Difficulty, &ex.Statement, &ex.Latex, &ex.ExpectedAnswer, &ex.Solution, &ex.Source, &ex.VerifiedByMath)
+			if err != nil {
+				http.Error(w, `{"error":"exercise not found"}`, http.StatusNotFound)
+				return
+			}
+
+			verifyResult, err := mathClient.Verify(ex.ExpectedAnswer, ex.ExpectedAnswer, "")
+			mathValid := err == nil && verifyResult != nil && verifyResult.Success
+
+			db.Exec(r.Context(),
+				`UPDATE exercises SET verified_by_math = $1, status = $2 WHERE id = $3`,
+				mathValid, map[bool]string{true: "validated", false: "invalid"}[mathValid], exerciseID,
+			)
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"exercise_id":  exerciseID,
+				"valid":        mathValid,
+				"math_checked": true,
+			})
+		})
+
 		r.Get("/{exerciseID}/hints", func(w http.ResponseWriter, r *http.Request) {
 			exerciseID := chi.URLParam(r, "exerciseID")
 			var hints json.RawMessage
@@ -104,6 +167,79 @@ func ExerciseRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			w.Write(hints)
 		})
 	}
+}
+
+func GetNextExercise(ctx context.Context, db *pgxpool.Pool, cfg *config.Config, studentID, courseID string) (*Exercise, string, error) {
+	profile, err := GetOrCreateProfile(db, studentID, courseID)
+	if err != nil {
+		return nil, "", fmt.Errorf("profile: %w", err)
+	}
+
+	mastery, err := GetMasteryMap(db, studentID, courseID)
+	if err != nil {
+		return nil, "", fmt.Errorf("mastery: %w", err)
+	}
+
+	targetConcept := ""
+	targetDifficulty := 2
+
+	lowestMastery := 1.0
+	for cid, cm := range mastery {
+		if cm.Mastery < lowestMastery {
+			lowestMastery = cm.Mastery
+			targetConcept = cid
+		}
+	}
+
+	if targetConcept == "" {
+		var cid string
+		err := db.QueryRow(ctx,
+			`SELECT id FROM concepts WHERE course_id = $1 ORDER BY difficulty_base ASC LIMIT 1`, courseID,
+		).Scan(&cid)
+		if err == nil {
+			targetConcept = cid
+		}
+	}
+
+	if targetConcept == "" {
+		return nil, "", fmt.Errorf("no concept available")
+	}
+
+	m := mastery[targetConcept]
+	switch {
+	case m.Mastery >= 0.8:
+		targetDifficulty = int(math.Min(float64(m.Attempts/3+3), 5))
+	case m.Mastery >= 0.5:
+		targetDifficulty = int(math.Min(float64(m.Attempts/3+2), 4))
+	default:
+		targetDifficulty = int(math.Max(2-float64(m.Attempts), 1))
+	}
+	if targetDifficulty < 1 {
+		targetDifficulty = 1
+	}
+	if targetDifficulty > 5 {
+		targetDifficulty = 5
+	}
+
+	var ex Exercise
+	err = db.QueryRow(ctx,
+		`SELECT id, concept_id, difficulty, statement, latex, expected_answer, solution, solution_steps, hints, common_errors, source, verified_by_math
+		 FROM exercises
+		 WHERE concept_id = $1 AND difficulty = $2 AND status = 'validated'
+		 ORDER BY RANDOM() LIMIT 1`,
+		targetConcept, targetDifficulty,
+	).Scan(&ex.ID, &ex.ConceptID, &ex.Difficulty, &ex.Statement, &ex.Latex, &ex.ExpectedAnswer, &ex.Solution, &ex.SolutionSteps, &ex.Hints, &ex.CommonErrors, &ex.Source, &ex.VerifiedByMath)
+	if err == nil {
+		return &ex, fmt.Sprintf("Ejercicio de %s (dificultad %d)", targetConcept, targetDifficulty), nil
+	}
+
+	ex2, err := GenerateExercise(db, cfg, targetConcept, targetDifficulty)
+	if err != nil {
+		return nil, "", fmt.Errorf("generate: %w", err)
+	}
+
+	rec := fmt.Sprintf("Ejercicio generado de %s (dificultad %d). Mastery actual: %.0f%%", targetConcept, targetDifficulty, profile.OverallLevel*100)
+	return ex2, rec, nil
 }
 
 func GenerateExercise(db *pgxpool.Pool, cfg *config.Config, conceptID string, difficulty int) (*Exercise, error) {
