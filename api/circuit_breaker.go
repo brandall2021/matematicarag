@@ -41,13 +41,13 @@ func NewCircuitBreaker(name string, threshold int, cooldown time.Duration) *Circ
 
 func (cb *CircuitBreaker) wrapHTTPClient(client *http.Client) *http.Client {
 	wrapped := *client
+	if client.Transport == nil {
+		client.Transport = http.DefaultTransport
+	}
 	wrapped.Transport = &circuitBreakerRoundTripper{
 		original: client.Transport,
 		cb:       cb,
 		client:   client,
-	}
-	if wrapped.Transport == nil {
-		wrapped.Transport = http.DefaultTransport
 	}
 	return &wrapped
 }
@@ -63,7 +63,11 @@ func (rt *circuitBreakerRoundTripper) RoundTrip(req *http.Request) (*http.Respon
 		return nil, errors.New("service unavailable: circuit breaker open")
 	}
 
-	resp, err := rt.client.Transport.RoundTrip(req)
+	transport := rt.original
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		rt.cb.RecordFailure()
 		return nil, err
