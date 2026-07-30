@@ -631,6 +631,40 @@ func Migrate(db *pgxpool.Pool) error {
 		`ALTER TABLE student_errors ADD COLUMN IF NOT EXISTS resolved BOOLEAN DEFAULT false`,
 		`ALTER TABLE student_errors ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ`,
 		`ALTER TABLE student_errors ADD COLUMN IF NOT EXISTS attempt_id UUID`,
+		`CREATE TABLE IF NOT EXISTS math_attempts (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			activity_id UUID,
+			concept_id VARCHAR(100) NOT NULL,
+			answer_raw TEXT NOT NULL DEFAULT '',
+			answer_normalized TEXT DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'UNDETERMINED'
+				CHECK (status IN ('CORRECT','PARTIALLY_CORRECT','INCORRECT','UNDETERMINED','INVALID_INPUT')),
+			score REAL DEFAULT 0.0 CHECK (score BETWEEN 0.0 AND 1.0),
+			final_answer_correct BOOLEAN,
+			steps_correct INT DEFAULT 0,
+			steps_total INT DEFAULT 0,
+			error_type VARCHAR(50),
+			error_detail TEXT,
+			confidence REAL DEFAULT 0.0,
+			feedback TEXT,
+			evidence JSONB DEFAULT '{}',
+			metadata JSONB DEFAULT '{}',
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_math_attempts_student ON math_attempts(student_id, concept_id)`,
+		`CREATE TABLE IF NOT EXISTS math_step_results (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			attempt_id UUID NOT NULL REFERENCES math_attempts(id) ON DELETE CASCADE,
+			step_number INT NOT NULL,
+			expected TEXT NOT NULL DEFAULT '',
+			actual TEXT NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'INCORRECT'
+				CHECK (status IN ('CORRECT','INCORRECT','SKIPPED')),
+			error_type VARCHAR(50),
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_math_step_results_attempt ON math_step_results(attempt_id)`,
 	}
 
 	for _, m := range migrations {

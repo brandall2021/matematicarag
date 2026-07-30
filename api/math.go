@@ -18,6 +18,7 @@ type MathRequest struct {
 
 func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	mathClient := NewMathClient(cfg)
+	evaluator := NewMathEvaluator(mathClient, cfg.MathServiceURL)
 
 	return func(r chi.Router) {
 		r.Post("/evaluate", func(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +35,36 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			if err != nil {
 				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
 				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(result)
+		})
+
+		r.Post("/evaluate/steps", func(w http.ResponseWriter, r *http.Request) {
+			studentID := ""
+			if uid, ok := r.Context().Value(UserIDKey).(string); ok {
+				studentID = uid
+			}
+			var evalReq EvaluateRequest
+			if err := json.NewDecoder(r.Body).Decode(&evalReq); err != nil {
+				http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+				return
+			}
+			evalReq.StudentID = studentID
+			if evalReq.Expression == "" {
+				http.Error(w, `{"error":"expression is required"}`, http.StatusBadRequest)
+				return
+			}
+			result, err := evaluator.Evaluate(r.Context(), &evalReq)
+			if err != nil {
+				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				return
+			}
+			if studentID != "" {
+				attemptID, persistErr := evaluator.PersistAttempt(r.Context(), db, result, &evalReq)
+				if persistErr == nil {
+					result.AttemptID = attemptID
+				}
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(result)
