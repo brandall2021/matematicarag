@@ -153,13 +153,13 @@ func main() {
 		qdrantAlive := qdrantErr == nil && qdrantBody != nil
 
 		status := "ok"
-		code := http.StatusOK
-		if !dbAlive || !mathAlive {
+		if !dbAlive {
 			status = "degraded"
-			code = http.StatusServiceUnavailable
+		} else if !mathAlive {
+			status = "degraded"
 		}
 
-		w.WriteHeader(code)
+		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]any{
 			"status": status,
 			"services": map[string]string{
