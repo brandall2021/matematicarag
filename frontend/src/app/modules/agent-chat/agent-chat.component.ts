@@ -278,19 +278,20 @@ type Phase = 'idle' | 'thinking' | 'done';
     .dot:nth-child(2) { animation-delay: 0.2s; }
     .dot:nth-child(3) { animation-delay: 0.4s; }
     @keyframes pulse { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.1); } }
-    .input-area { padding: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); align-items: center; }
-    .agent-mathfield { flex: 1; min-height: 48px; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); font-size: 1.1rem; }
-    .input-area:focus-within .agent-mathfield { border-color: var(--accent); }
+    .input-area { padding: var(--space-md); display: flex; gap: var(--space-sm); border-top: 1px solid var(--border); align-items: center; }
+    .agent-mathfield { flex: 1; min-height: 48px; padding: 0.5rem; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--input-bg); font-size: 1.1rem; }
+    .input-area:focus-within .agent-mathfield { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
     :host ::ng-deep #agent-mathfield {
       --math-field-border: none;
       --math-field-border-radius: 0;
       --math-field-background: transparent;
       --math-field-color: var(--text);
-      --math-field-placeholder-color: var(--text-secondary);
+      --math-field-placeholder-color: var(--text-tertiary);
       font-size: 1.1rem;
     }
     :host ::ng-deep .ML__virtual-keyboard {
       background: var(--surface) !important;
+      border-radius: var(--radius-md) !important;
     }
     .input-area button mat-icon { font-size: 18px; }
   `]

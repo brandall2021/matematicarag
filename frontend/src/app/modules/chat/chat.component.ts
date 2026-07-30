@@ -123,19 +123,20 @@ interface ChatMsg {
     .citation-card-header { font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; flex-wrap: wrap; }
     .citation-score { margin-left: auto; font-weight: 700; font-size: 12px; }
     .citation-card-content { font-size: 12px; color: var(--text-secondary); line-height: 1.5; font-style: italic; }
-    .input-area { padding: 1rem; display: flex; gap: 0.5rem; border-top: 1px solid var(--border); align-items: center; }
-    .chat-mathfield { flex: 1; min-height: 48px; padding: 0.5rem; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); font-size: 1.1rem; }
-    .input-area:focus-within .chat-mathfield { border-color: var(--accent); }
+    .input-area { padding: var(--space-md); display: flex; gap: var(--space-sm); border-top: 1px solid var(--border); align-items: center; }
+    .chat-mathfield { flex: 1; min-height: 48px; padding: 0.5rem; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--input-bg); font-size: 1.1rem; }
+    .input-area:focus-within .chat-mathfield { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-muted); }
     :host ::ng-deep #chat-mathfield {
       --math-field-border: none;
       --math-field-border-radius: 0;
       --math-field-background: transparent;
       --math-field-color: var(--text);
-      --math-field-placeholder-color: var(--text-secondary);
+      --math-field-placeholder-color: var(--text-tertiary);
       font-size: 1.1rem;
     }
     :host ::ng-deep .ML__virtual-keyboard {
       background: var(--surface) !important;
+      border-radius: var(--radius-md) !important;
     }
   `]
 })
