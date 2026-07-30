@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -21,7 +22,10 @@ import (
 	chimw "github.com/go-chi/chi/v5/middleware"
 )
 
+var startTime time.Time
+
 func main() {
+	startTime = time.Now()
 	cfg := config.Load()
 
 	db, err := database.Connect(cfg.DatabaseURL)
@@ -34,6 +38,8 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	metricsMW := api.NewMetricsMiddleware()
+
 	apiRouter := chi.NewRouter()
 
 	apiRouter.Use(chimw.RequestID)
@@ -43,6 +49,7 @@ func main() {
 	apiRouter.Use(chimw.Timeout(60 * time.Second))
 	apiRouter.Use(middleware.CORS(cfg.CORSOriginsList()))
 	apiRouter.Use(middleware.RateLimit(120))
+	apiRouter.Use(metricsMW.Wrap)
 
 	mathClient := api.NewMathClient(cfg)
 
@@ -130,22 +137,38 @@ func main() {
 			r.Use(api.AuthMiddleware(cfg.JWTSecret))
 			r.Route("/agent", api.AgentRoutes(db, pedagogicalAgent))
 		})
+
+		r.Route("/metrics", api.MetricsRoutes(db))
 	})
 
 	apiRouter.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
-	})
 
-	apiRouter.Get("/health/qdrant", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		body, err := api.QdrantHealthCheck()
-		if err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"status":"error","error":"` + err.Error() + `"}`))
-			return
+		mathAlive := mathClient.HealthCheck()
+		var dbAlive bool
+		err := db.Ping(r.Context())
+		dbAlive = err == nil
+
+		qdrantBody, qdrantErr := api.QdrantHealthCheck()
+		qdrantAlive := qdrantErr == nil && qdrantBody != nil
+
+		status := "ok"
+		code := http.StatusOK
+		if !dbAlive || !mathAlive {
+			status = "degraded"
+			code = http.StatusServiceUnavailable
 		}
-		w.Write(body)
+
+		w.WriteHeader(code)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status": status,
+			"services": map[string]string{
+				"database": map[bool]string{true: "up", false: "down"}[dbAlive],
+				"math":     map[bool]string{true: "up", false: "down"}[mathAlive],
+				"qdrant":   map[bool]string{true: "up", false: "down"}[qdrantAlive],
+			},
+			"uptime_seconds": time.Since(startTime).Seconds(),
+		})
 	})
 
 	staticDir := "./static"

@@ -14,8 +14,10 @@ import (
 )
 
 type MathClient struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL       string
+	httpClient    *http.Client
+	circuitBreaker *CircuitBreaker
+	retryCfg      RetryConfig
 }
 
 type MathResult struct {
@@ -47,11 +49,17 @@ type VerifyResult struct {
 
 func NewMathClient(cfg *config.Config) *MathClient {
 	timeout := time.Duration(cfg.MathTimeout) * time.Second
+	cb := NewCircuitBreaker("math-service", 5, 30*time.Second)
+	RegisterCircuitBreaker(cb)
+
+	client := &http.Client{Timeout: timeout}
+	wrappedClient := cb.wrapHTTPClient(client)
+
 	return &MathClient{
-		baseURL: cfg.MathServiceURL,
-		httpClient: &http.Client{
-			Timeout: timeout,
-		},
+		baseURL:        cfg.MathServiceURL,
+		httpClient:     wrappedClient,
+		circuitBreaker: cb,
+		retryCfg:       DefaultRetryConfig(),
 	}
 }
 
@@ -61,40 +69,68 @@ func (c *MathClient) post(path string, body interface{}) ([]byte, error) {
 		return nil, fmt.Errorf("[MATH] marshal request: %w", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.httpClient.Timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("[MATH] create request: %w", err)
+	if !c.circuitBreaker.Allow() {
+		log.Printf("[MATH] circuit breaker open for %s, skipping", path)
+		return nil, fmt.Errorf("[MATH] service unavailable (circuit breaker open)")
 	}
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			log.Printf("[MATH] timeout calling %s", path)
-			return nil, fmt.Errorf("[MATH] request timeout after %s", c.httpClient.Timeout)
+	var result []byte
+	err = retryWithBackoff(c.retryCfg, func() error {
+		start := time.Now()
+
+		ctx, cancel := context.WithTimeout(context.Background(), c.httpClient.Timeout)
+		defer cancel()
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(payload))
+		if err != nil {
+			return fmt.Errorf("[MATH] create request: %w", err)
 		}
-		return nil, fmt.Errorf("[MATH] request failed: %w", err)
-	}
-	defer resp.Body.Close()
+		req.Header.Set("Content-Type", "application/json")
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("[MATH] read response: %w", err)
-	}
+		resp, err := c.httpClient.Do(req)
+		duration := time.Since(start).Milliseconds()
+		if err != nil {
+			c.circuitBreaker.RecordFailure()
+			RecordMathRequest(duration, true)
+			if ctx.Err() == context.DeadlineExceeded {
+				log.Printf("[MATH] timeout calling %s after %s", path, c.httpClient.Timeout)
+				return fmt.Errorf("[MATH] request timeout after %s", c.httpClient.Timeout)
+			}
+			return fmt.Errorf("[MATH] request failed: %w", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusRequestTimeout {
-		log.Printf("[MATH] service returned 408 (timeout) for %s", path)
-		return nil, fmt.Errorf("[MATH] math service timeout (408)")
-	}
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("[MATH] service returned %d for %s: %s", resp.StatusCode, path, string(bodyBytes))
-		return nil, fmt.Errorf("[MATH] service error %d: %s", resp.StatusCode, string(bodyBytes))
-	}
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("[MATH] read response: %w", err)
+		}
 
-	return bodyBytes, nil
+		if resp.StatusCode >= 500 {
+			c.circuitBreaker.RecordFailure()
+			RecordMathRequest(duration, true)
+			log.Printf("[MATH] service returned %d for %s: %s", resp.StatusCode, path, string(bodyBytes))
+			return fmt.Errorf("[MATH] service error %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+
+		if resp.StatusCode == http.StatusRequestTimeout {
+			c.circuitBreaker.RecordFailure()
+			RecordMathRequest(duration, true)
+			log.Printf("[MATH] service returned 408 (timeout) for %s", path)
+			return fmt.Errorf("[MATH] math service timeout (408)")
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			RecordMathRequest(duration, true)
+			return fmt.Errorf("[MATH] unexpected status %d", resp.StatusCode)
+		}
+
+		c.circuitBreaker.RecordSuccess()
+		RecordMathRequest(duration, false)
+		result = bodyBytes
+		return nil
+	})
+
+	return result, err
 }
 
 type evalRequest struct {
