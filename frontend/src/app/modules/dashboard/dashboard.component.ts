@@ -9,7 +9,8 @@ import { MatIconModule } from '@angular/material/icon';
   imports: [CommonModule, MatIconModule],
   template: `
     <div class="container">
-      <h1><mat-icon>dashboard</mat-icon> Dashboard Admin</h1>
+      <h1><mat-icon>dashboard</mat-icon> Panel de Administración</h1>
+      <p class="period-caption">Resumen general de la plataforma</p>
       @if (loading()) {
         <div class="loading-state"><mat-icon class="spin">sync</mat-icon> Cargando estadísticas...</div>
       } @else {
@@ -35,6 +36,12 @@ import { MatIconModule } from '@angular/material/icon';
             <p>Documentos indexados</p>
           </div>
         </div>
+        @if (stats().totalDocuments === 0) {
+          <div class="empty-docs">
+            <mat-icon>description</mat-icon>
+            <p>No hay documentos indexados todavía. Subí material desde la sección Documentos.</p>
+          </div>
+        }
       }
     </div>
   `,
@@ -53,6 +60,9 @@ import { MatIconModule } from '@angular/material/icon';
     .stat-icon { font-size: 2rem; width: 2rem; height: 2rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
     .stat-card h3 { font-size: 2.5rem; color: var(--accent); margin: 0; font-weight: 700; }
     .stat-card p { color: var(--text-secondary); margin-top: 0.25rem; font-size: 0.85rem; }
+    .period-caption { color: var(--text-secondary); font-size: 0.85rem; margin: -1rem 0 1.5rem 0; }
+    .empty-docs { display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; color: var(--text-secondary); font-size: 0.85rem; }
+    .empty-docs mat-icon { color: var(--accent); }
   `]
 })
 export class DashboardComponent implements OnInit {

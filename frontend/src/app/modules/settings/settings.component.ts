@@ -2,6 +2,7 @@ import { Component, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -48,7 +49,7 @@ interface Setting {
               <input [(ngModel)]="newUser.name" placeholder="Nombre" class="form-input">
               <input [(ngModel)]="newUser.lastName" placeholder="Apellido" class="form-input">
               <input [(ngModel)]="newUser.email" placeholder="Email" class="form-input" type="email">
-              <input [(ngModel)]="newUser.password" placeholder="Password" class="form-input" type="password">
+              <input [(ngModel)]="newUser.password" placeholder="Contraseña" class="form-input" type="password">
               <select [(ngModel)]="newUser.role" class="form-select">
                 <option value="STUDENT">Alumno</option>
                 <option value="TEACHER">Profesor</option>
@@ -74,7 +75,7 @@ interface Setting {
                     <option value="TEACHER">Profesor</option>
                     <option value="ADMIN">Administrador</option>
                   </select>
-                  <button mat-icon-button color="warn" (click)="deleteUser(user.id, user.name)">
+                  <button mat-icon-button color="warn" (click)="deleteUser(user.id, user.name)" aria-label="Eliminar usuario">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
@@ -113,7 +114,7 @@ interface Setting {
             <div class="create-form">
               <input [(ngModel)]="newKey.key" placeholder="Nombre (ej: OPENAI_API_KEY)" class="form-input">
               <input [(ngModel)]="newKey.value" placeholder="Valor de la API key" class="form-input" type="password">
-              <input [(ngModel)]="newKey.description" placeholder="Descripcion (opcional)" class="form-input">
+              <input [(ngModel)]="newKey.description" placeholder="Descripción (opcional)" class="form-input">
               <div class="form-actions">
                 <button mat-button (click)="showNewKey.set(false)">Cancelar</button>
                 <button mat-raised-button color="primary" (click)="createSetting()">Guardar</button>
@@ -122,7 +123,7 @@ interface Setting {
           }
 
           <div class="prompts-section">
-            <h3>Configuracion de IA</h3>
+            <h3>Configuración de IA</h3>
             <div class="prompt-card">
               <label>Proveedor de IA</label>
               <select [(ngModel)]="aiProvider" (ngModelChange)="onProviderChange()" class="form-select">
@@ -185,18 +186,18 @@ interface Setting {
                   <input [type]="showValue[setting.key] ? 'text' : 'password'"
                          [(ngModel)]="setting.value"
                          class="setting-input">
-                  <button mat-icon-button (click)="showValue[setting.key] = !showValue[setting.key]">
+                  <button mat-icon-button (click)="showValue[setting.key] = !showValue[setting.key]" aria-label="Mostrar u ocultar valor">
                     <mat-icon>{{ showValue[setting.key] ? 'visibility_off' : 'visibility' }}</mat-icon>
                   </button>
                   <button mat-raised-button color="primary" (click)="saveSetting(setting)">Guardar</button>
-                  <button mat-icon-button color="warn" (click)="deleteSetting(setting.key)">
+                  <button mat-icon-button color="warn" (click)="deleteSetting(setting.key)" aria-label="Eliminar configuración">
                     <mat-icon>delete</mat-icon>
                   </button>
                 </div>
               </div>
             }
             @if (settings().length === 0 && !showNewKey()) {
-              <p class="empty">No hay API keys configuradas. Hace click en "Agregar key" para crear una.</p>
+              <p class="empty">No hay API keys configuradas. Hacé clic en "Agregar key" para crear una.</p>
             }
           </div>
         </div>
@@ -278,26 +279,26 @@ export class SettingsComponent implements OnInit {
   private modelsByProvider: Record<string, { models: string[], hint: string }> = {
     openai: {
       models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini', 'o3', 'o4-mini', 'gpt-3.5-turbo'],
-      hint: 'OpenAI - gpt-4.1 es el modelo mas capaz. gpt-4o-mini es rapido y economico.'
+      hint: 'OpenAI - gpt-4.1 es el modelo más capaz. gpt-4o-mini es rápido y económico.'
     },
     anthropic: {
       models: ['claude-opus-4-7', 'claude-sonnet-4-6', 'claude-opus-4-6', 'claude-opus-4-5', 'claude-haiku-4-5', 'claude-sonnet-4-5'],
-      hint: 'Anthropic Claude - claude-opus-4-7 es el mas capaz. claude-haiku-4-5 es rapido.'
+      hint: 'Anthropic Claude - claude-opus-4-7 es el más capaz. claude-haiku-4-5 es rápido.'
     },
     groq: {
       models: ['llama-4-scout-17b-16e-instruct', 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
-      hint: 'Groq - Ultra rapido. llama-4-scout es el mas nuevo.'
+      hint: 'Groq - Ultra rápido. llama-4-scout es el más nuevo.'
     },
     openrouter: {
       models: ['openai/gpt-4.1', 'anthropic/claude-opus-4-7', 'anthropic/claude-sonnet-4-6', 'meta-llama/llama-4-scout-17b-16e-instruct', 'google/gemini-2.5-pro', 'deepseek/deepseek-r1'],
-      hint: 'OpenRouter - Acceso a multiples proveedores con una sola key.'
+      hint: 'OpenRouter - Acceso a múltiples proveedores con una sola key.'
     }
   };
 
   availableModels = signal<string[]>(this.modelsByProvider['openai'].models);
   modelHint = signal(this.modelsByProvider['openai'].hint);
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, public auth: AuthService) {}
 
   ngOnInit() {
     this.loadUsers();
@@ -415,6 +416,10 @@ export class SettingsComponent implements OnInit {
   }
 
   updateRole(userId: string, newRole: string) {
+    if (this.auth.currentUser()?.id === userId && newRole !== 'ADMIN') {
+      this.showMessage('No podés cambiar tu propio rol de Administrador', 'error');
+      return;
+    }
     const roleLabel: Record<string, string> = { STUDENT: 'Alumno', TEACHER: 'Profesor', ADMIN: 'Administrador' };
     if (!confirm(`¿Cambiar el rol a "${roleLabel[newRole] || newRole}"?`)) return;
     this.http.put(`${environment.apiUrl}/api/users/${userId}/role`, { role: newRole }).subscribe({
@@ -424,6 +429,10 @@ export class SettingsComponent implements OnInit {
   }
 
   deleteUser(userId: string, name: string) {
+    if (this.auth.currentUser()?.id === userId) {
+      this.showMessage('No podés eliminar tu propio usuario', 'error');
+      return;
+    }
     if (!confirm(`Eliminar usuario "${name}"?`)) return;
     this.http.delete(`${environment.apiUrl}/api/users/${userId}`).subscribe({
       next: () => { this.loadUsers(); this.showMessage('Usuario eliminado'); },
