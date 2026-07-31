@@ -124,14 +124,19 @@ matematicarag/
 │   ├── chat.go                     # Chat con integracion RAG automatica
 │   ├── documents.go                # Subida, listado y borrado de documentos
 │   ├── rag.go / qdrant.go          # RAG hibrido + embeddings + Qdrant
+│   ├── openai.go                   # Multi-proveedor LLM
 │   ├── math.go / mathclient.go     # Proxy al math-service (SymPy)
 │   ├── math_evaluator.go           # Pipeline de evaluacion matematica estructurada
 │   ├── tutor.go                    # POST /api/tutor/solve (orquestador Fase 2)
 │   ├── intent.go                   # Clasificador de intencion
 │   ├── sessions.go                 # Sesiones tutor adaptativo
 │   ├── exercises.go                # Banco de ejercicios + generacion adaptativa
+│   ├── adaptive.go                 # Recomendacion de siguiente concepto + dificultad (legacy)
 │   ├── learning.go                 # Endpoints /api/learning/* (perfil, mastery, eventos, rutas)
+│   ├── knowledge.go                # Grafo de conceptos + prerrequisitos
 │   ├── student.go / teacher.go     # Dashboards de estudiante y profesor
+│   ├── users.go                    # Gestion de usuarios
+│   ├── history.go                  # Historial de sesiones
 │   ├── dashboards.go               # /api/dashboard/student y /api/dashboard/teacher
 │   ├── assessments.go              # Evaluaciones (Fase 4)
 │   ├── questions.go / grading.go   # Banco de preguntas + calificacion
@@ -142,6 +147,8 @@ matematicarag/
 │   ├── alerts.go                   # Alertas academicas
 │   ├── export.go                   # Exportacion CSV
 │   ├── audit.go                    # Auditoria
+│   ├── indexer.go                  # Re-indexacion (ADMIN)
+│   ├── migration.go                # Helpers para migracion de datos
 │   ├── agent_routes.go             # POST /api/agent/chat
 │   ├── settings.go / stats.go      # Panel admin
 │   ├── middleware.go / circuit_breaker.go / metrics.go   # Resiliencia y observabilidad
