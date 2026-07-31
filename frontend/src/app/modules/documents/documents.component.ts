@@ -31,8 +31,13 @@ interface Chunk {
   imports: [CommonModule, MatButtonModule, MatIconModule],
   template: `
     <div class="container">
-      <h1>Gestión Documental</h1>
-      <p class="subtitle">Subí material de estudio (PDF, DOCX, TXT, Markdown) para indexarlo en la base vectorial</p>
+      @if (auth.hasRole('ADMIN', 'TEACHER')) {
+        <h1>Gestión Documental</h1>
+        <p class="subtitle">Subí material de estudio (PDF, DOCX, TXT, Markdown) para indexarlo en la base vectorial</p>
+      } @else {
+        <h1>Material de estudio</h1>
+        <p class="subtitle">Documentos indexados por tus docentes, disponibles para consultar en el Chat.</p>
+      }
 
       @if (auth.hasRole('ADMIN', 'TEACHER')) {
         <div class="upload-area"
@@ -90,6 +95,9 @@ interface Chunk {
                 @if (doc.status === 'indexed') {
                   &middot; {{ doc.chunkCount }} chunks
                 }
+                @if (doc.status === 'indexed' && doc.chunkCount === 0) {
+                  <span class="status"><mat-icon>hourglass_empty</mat-icon> Sin contenido indexado</span>
+                }
               </div>
             </div>
             <div class="doc-actions">
@@ -107,7 +115,11 @@ interface Chunk {
           </div>
         }
         @if (docs().length === 0 && !loading()) {
-          <div class="empty">No hay documentos cargados aun.</div>
+          @if (auth.hasRole('ADMIN', 'TEACHER')) {
+            <div class="empty">Todavía no hay documentos cargados. Subí el primer material para indexarlo en la base vectorial.</div>
+          } @else {
+            <div class="empty">Todavía no hay material de estudio disponible. Consultá con tu docente.</div>
+          }
         }
       </div>
 
@@ -261,7 +273,7 @@ export class DocumentsComponent implements OnDestroy {
           } else if (attempts >= 20) {
             this.stopPolling();
             this.processingDoc.set('');
-            this.showMsg('Tarde mas de lo esperado. Refresca para ver el estado.', true);
+            this.showMsg('Tardó más de lo esperado. Refrescá para ver el estado.', true);
           }
         }
       });
