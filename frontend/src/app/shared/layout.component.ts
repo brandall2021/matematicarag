@@ -12,7 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   imports: [RouterOutlet, RouterLink, RouterLinkActive, MatButtonModule, MatIconModule, MatTooltipModule],
   template: `
     <div class="layout">
-      <button class="hamburger" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Toggle sidebar">
+      <button class="hamburger" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Alternar menú">
         <mat-icon>{{ sidebarOpen() ? 'close' : 'menu' }}</mat-icon>
       </button>
       @if (sidebarOpen()) {
@@ -32,13 +32,17 @@ import { MatTooltipModule } from '@angular/material/tooltip';
           <a routerLink="/tutor" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)" matTooltip="Ejercicios prácticos, verificación y ayuda paso a paso"><mat-icon>school</mat-icon><span>Tutor</span></a>
 
           <div class="nav-section-label">Contenido</div>
-          <a routerLink="/documents" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>folder</mat-icon><span>Documentos</span></a>
-          <a routerLink="/bdvectorial" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>database</mat-icon><span>BD Vectorial</span></a>
+          <a routerLink="/documents" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>folder</mat-icon><span>{{ auth.hasRole('ADMIN', 'TEACHER') ? 'Documentos' : 'Material' }}</span></a>
+          @if (auth.hasRole('ADMIN', 'TEACHER')) {
+            <a routerLink="/bdvectorial" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>database</mat-icon><span>BD Vectorial</span></a>
+          }
           <a routerLink="/history" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>history</mat-icon><span>Historial</span></a>
 
           <div class="nav-section-label">Aprendizaje</div>
           <a routerLink="/assessment" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>quiz</mat-icon><span>Evaluaciones</span></a>
-          <a routerLink="/analytics" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>analytics</mat-icon><span>Analíticas</span></a>
+          @if (auth.hasRole('ADMIN', 'TEACHER')) {
+            <a routerLink="/analytics" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>analytics</mat-icon><span>Analíticas</span></a>
+          }
           <a routerLink="/my-progress" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>trending_up</mat-icon><span>Mi Progreso</span></a>
           <a routerLink="/aprendizaje" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>insights</mat-icon><span>Aprendizaje</span></a>
 
