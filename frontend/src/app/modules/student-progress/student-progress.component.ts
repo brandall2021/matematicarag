@@ -57,7 +57,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
           <div class="recommendation-card">
             <mat-icon>auto_awesome</mat-icon>
             <div>
-              <strong>Recomendacion:</strong> {{ recommendation()!.concept_name }}
+              <strong>Recomendación:</strong> {{ recommendation()!.concept_name }}
               <span class="rec-reason">{{ recommendation()!.reason }}</span>
             </div>
           </div>

@@ -77,7 +77,7 @@ interface LearningPathStep {
             </div>
             <div class="stat-chip">
               <mat-icon class="stat-icon weak">warning</mat-icon>
-              <span>{{ profile()!.weak_concepts.length }} debiles</span>
+              <span>{{ profile()!.weak_concepts.length }} débiles</span>
             </div>
             <div class="stat-chip">
               <mat-icon class="stat-icon total">psychology</mat-icon>
@@ -104,13 +104,13 @@ interface LearningPathStep {
                 </div>
               }
               @if (profile()!.concepts.length === 0) {
-                <p class="empty">Aun no hay datos de concepto. Practica para ver tu progreso.</p>
+                <p class="empty">Aún no hay datos de concepto. Practicá para ver tu progreso.</p>
               }
             </div>
           </div>
 
           <div class="section">
-            <h2><mat-icon>auto_awesome</mat-icon> Accion Recomendada</h2>
+            <h2><mat-icon>auto_awesome</mat-icon> Acción Recomendada</h2>
             @if (recommendation()) {
               <div class="rec-card">
                 <div class="rec-header">
@@ -126,7 +126,7 @@ interface LearningPathStep {
             } @else {
               <div class="rec-card empty-rec">
                 <mat-icon>check_circle</mat-icon>
-                <p>No hay recomendaciones pendientes. Sigue practicando!</p>
+                <p>No hay recomendaciones pendientes. ¡Seguí practicando!</p>
               </div>
             }
           </div>
@@ -134,7 +134,7 @@ interface LearningPathStep {
 
         @if (profile()!.weak_concepts.length > 0) {
           <div class="section">
-            <h2><mat-icon>error_outline</mat-icon> Conceptos Debiles</h2>
+            <h2><mat-icon>error_outline</mat-icon> Conceptos Débiles</h2>
             <div class="chips">
               @for (w of profile()!.weak_concepts; track w) {
                 <span class="chip weak-chip">{{ w }}</span>
