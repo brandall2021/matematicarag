@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MathfieldElement } from 'mathlive';
@@ -38,8 +39,8 @@ interface ChatMsg {
           @if (messages().length === 0) {
             <div class="welcome-message">
               <div class="welcome-icon"><mat-icon>auto_awesome</mat-icon></div>
-              <h2>Chat Matemático</h2>
-              <p>Hacé consultas sobre matemática con análisis de tus documentos de estudio.</p>
+              <h2>¿Qué querés resolver hoy?</h2>
+              <p>¡Hola {{ auth.currentUser()?.name || 'estudiante' }}! Hacé consultas sobre matemática con análisis de tus documentos de estudio.</p>
               <div class="suggestions">
                 <button class="suggestion-chip" (click)="setExample('Derivar x^2 + 3x')">
                   <mat-icon>calculate</mat-icon> Derivar x² + 3x
@@ -117,7 +118,7 @@ interface ChatMsg {
             class="chat-mathfield"
             placeholder="Escribí tu pregunta de matemática..."
           ></math-field>
-          <button mat-raised-button color="primary" (click)="sendMessage()" [disabled]="!newMessage">Enviar</button>
+          <button mat-raised-button color="primary" (click)="sendMessage()" [disabled]="!newMessage" aria-label="Enviar mensaje">Enviar</button>
         </div>
       </div>
     </div>
@@ -182,7 +183,7 @@ export class ChatComponent implements AfterViewInit, OnDestroy {
 
   private mf: any = null;
 
-  constructor(private api: ApiService, private router: Router, private zone: NgZone) {}
+  constructor(private api: ApiService, private router: Router, private zone: NgZone, public auth: AuthService) {}
 
   setExample(text: string) {
     this.newMessage = text;
