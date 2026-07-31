@@ -76,7 +76,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
           <h2><mat-icon>people</mat-icon> Progreso por Estudiante</h2>
           <div class="student-table">
             <div class="student-header">
-              <span>Nombre</span><span>Email</span><span>Nivel</span><span>Intentos</span><span>Ultima vez</span>
+              <span>Nombre</span><span>Email</span><span>Nivel</span><span>Intentos</span><span>Última vez</span>
             </div>
             @for (s of students(); track s.student_id) {
               <div class="student-row">

@@ -484,7 +484,7 @@ export class TutorComponent implements AfterViewInit, OnDestroy {
       },
       error: (e) => {
         this.loading.set(false);
-        this.error.set('Error al crear la sesion');
+        this.error.set('Error al crear la sesión');
       }
     });
   }

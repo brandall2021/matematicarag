@@ -35,7 +35,7 @@ interface Chunk {
   template: `
     <div class="container">
       <h1><mat-icon>database</mat-icon> Base Vectorial (Qdrant)</h1>
-      <p class="subtitle">Documentos indexados en la coleccion <code>matematica_chunks</code> — vectores de 1536 dimensiones (OpenAI text-embedding-3-small)</p>
+      <p class="subtitle">Documentos indexados en la colección <code>matematica_chunks</code> — vectores de 1536 dimensiones (OpenAI text-embedding-3-small)</p>
 
       @if (loading()) {
         <div class="loading"><mat-icon class="spin">sync</mat-icon> Cargando documentos...</div>
