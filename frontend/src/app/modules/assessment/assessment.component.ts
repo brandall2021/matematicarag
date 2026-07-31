@@ -64,7 +64,11 @@ type PageMode = 'list' | 'taking' | 'results' | 'teacher-list' | 'create-form' |
         @if (filteredAssessments().length === 0) {
           <div class="empty-state">
             <mat-icon>quiz</mat-icon>
-            <p>No hay evaluaciones {{ teacherTab() === 'draft' ? 'en borrador' : teacherTab() === 'published' ? 'publicadas' : '' }}</p>
+            <p>Todavía no hay evaluaciones {{ teacherTab() === 'draft' ? 'en borrador' : teacherTab() === 'published' ? 'publicadas' : 'creadas' }}</p>
+            <span class="empty-hint">Creá tu primera evaluación para compartirla con tus estudiantes.</span>
+            <button mat-raised-button color="primary" (click)="showCreateForm()" class="empty-cta">
+              <mat-icon>add</mat-icon> Nueva Evaluación
+            </button>
           </div>
         }
         @for (a of filteredAssessments(); track a.id) {
@@ -278,8 +282,11 @@ type PageMode = 'list' | 'taking' | 'results' | 'teacher-list' | 'create-form' |
         @if (studentAssessments().length === 0) {
           <div class="empty-state">
             <mat-icon>quiz</mat-icon>
-            <p>Todavía no hay evaluaciones publicadas</p>
-            <span class="empty-hint">Consultá con tu docente o volvé más tarde</span>
+            <p>No hay evaluaciones disponibles</p>
+            <span class="empty-hint">Consultá con tu docente o practicá con el tutor mientras tanto.</span>
+            <button mat-raised-button color="primary" routerLink="/tutor" class="empty-cta">
+              <mat-icon>school</mat-icon> Practicar con el tutor
+            </button>
           </div>
         }
         @for (assessment of studentAssessments(); track assessment.id) {
@@ -455,6 +462,8 @@ type PageMode = 'list' | 'taking' | 'results' | 'teacher-list' | 'create-form' |
       text-align: center; padding: var(--space-2xl); color: var(--text-secondary);
     }
     .empty-state mat-icon { font-size: 3rem; width: 3rem; height: 3rem; margin-bottom: var(--space-md); opacity: 0.4; }
+    .empty-cta { margin-top: 1rem; }
+    .empty-hint { display: block; color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.25rem; }
 
     .teacher-card, .assessment-card { margin-bottom: var(--space-md); cursor: pointer; transition: transform 0.15s; }
     .teacher-card:hover, .assessment-card:hover { transform: translateY(-2px); }
