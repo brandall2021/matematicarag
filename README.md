@@ -680,6 +680,66 @@ Endpoints del microservicio Python (no expuestos directamente al frontend):
 | GET | `/api/analytics/modelos` | Uso por modelo |
 | GET | `/api/analytics/top-users` | Top usuarios |
 
+### Agente Pedagógico (requiere auth)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| POST | `/api/agent/chat` | Procesa un mensaje con el agente: planifica tools, ejecuta, genera respuesta con citas |
+| GET | `/api/agent/sessions/{id}` | Recupera una sesion del agente |
+
+### Learning Adaptativo (requiere auth)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/learning/profile` | Perfil del estudiante |
+| GET | `/api/learning/progress` | Progreso global y por concepto |
+| GET | `/api/learning/mastery` | Mapa de dominio por concepto |
+| GET | `/api/learning/errors` | Errores del estudiante |
+| POST | `/api/learning/events` | Registra un evento de aprendizaje |
+| GET | `/api/learning/learner-profile` | Estado completo del alumno (learner state) |
+| GET | `/api/learning/recommendation` | Recomendacion personalizada |
+| GET | `/api/learning/path` | Ruta de aprendizaje construida |
+| POST | `/api/learning/suggest` | Registrar sugerencia pedagógica |
+| GET | `/api/learning/course-analytics` | Analiticas del curso (docentes) |
+| GET | `/api/learning/errors/common` | Errores comunes del curso (docentes) |
+
+### Dashboards (requiere auth)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/dashboard/student` | Dashboard del estudiante: progreso, actividad, stats |
+| GET | `/api/dashboard/teacher` | Dashboard del profesor: overview del curso (TEACHER/ADMIN) |
+
+### Alertas Academicas (requiere auth)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/alerts` | Alertas del estudiante (filtrables por severity) |
+| PUT | `/api/alerts/{alertID}/acknowledge` | Marcar alerta como reconocida |
+| POST | `/api/alerts/check` | Verifica y genera alertas academicas |
+
+### Recuperacion (requiere auth)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| POST | `/api/recovery` | Crear plan de recuperacion |
+| GET | `/api/recovery` | Planes del estudiante |
+| PUT | `/api/recovery/{planID}/complete` | Completar plan |
+| PUT | `/api/recovery/{planID}/cancel` | Cancelar plan |
+
+### Exportacion (requiere auth)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/export/assessment/{assessmentID}/csv` | Exportar evaluacion a CSV |
+| GET | `/api/export/student/{studentID}/csv` | Exportar resultados del estudiante |
+| GET | `/api/export/course/{courseID}/csv` | Exportar curso a CSV |
+
+### Conceptos Criticos (requiere TEACHER/ADMIN)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/api/teacher/critical-concepts` | Conceptos criticos del curso (por debajo del umbral) |
+
+### Metricas (publico)
+| Metodo | Ruta | Descripcion |
+|--------|------|-------------|
+| GET | `/metrics` | Metricas Prometheus |
+| GET | `/health` | Health check con estado de db, math-service y qdrant |
+
 ## Variables de Entorno
 
 ### Backend (Go)
