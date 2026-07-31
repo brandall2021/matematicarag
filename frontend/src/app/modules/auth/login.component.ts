@@ -29,7 +29,7 @@ import { MatButtonModule } from '@angular/material/button';
             <div class="error-message">{{ error() }}</div>
           }
           <button mat-raised-button color="primary" type="submit" class="full-width" [disabled]="loading()">
-            {{ loading() ? 'Ingresando...' : 'Iniciar Sesión' }}
+            {{ loading() ? 'Ingresando...' : 'Iniciar sesión' }}
           </button>
         </form>
         <p class="switch-text">¿No tenés cuenta? <a routerLink="/register">Registrate</a></p>
@@ -68,7 +68,7 @@ export class LoginComponent {
     this.error.set('');
     this.auth.login(this.email, this.password).subscribe({
       next: () => { this.router.navigate(['/chat']); this.loading.set(false); },
-      error: (err) => { this.error.set(err.error?.error || 'Error al iniciar sesion'); this.loading.set(false); }
+      error: (err) => { this.error.set(err.error?.error || 'Error al iniciar sesión'); this.loading.set(false); }
     });
   }
 }

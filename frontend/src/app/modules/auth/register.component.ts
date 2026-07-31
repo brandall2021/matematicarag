@@ -19,7 +19,7 @@ import { MatButtonModule } from '@angular/material/button';
         <form (ngSubmit)="onSubmit()">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Nombre</mat-label>
-            <input matInput [(ngModel)]="name" name="name" required>
+            <input matInput [(ngModel)]="name" name="name" required autocomplete="name">
           </mat-form-field>
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Email</mat-label>
