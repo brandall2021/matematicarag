@@ -785,6 +785,26 @@ ADAPTIVE_MASTERY_THRESHOLD=0.8
 ADAPTIVE_MAX_DIFFICULTY=5
 ```
 
+### Motor Adaptativo y Agente
+| Variable | Default | Descripcion |
+|----------|---------|-------------|
+| MASTERY_OLD_WEIGHT | `0.30` | Peso del mastery previo |
+| MASTERY_EVIDENCE_WEIGHT | `0.60` | Peso de la evidencia nueva |
+| MASTERY_HINT_PENALTY | `0.10` | Penalizacion por usar pista |
+| MASTERY_ERROR_PENALTY | `0.15` | Penalizacion por error |
+| MASTERY_RECENCY_FACTOR | `0.80` | Factor de recencia |
+| LEARNING_CRITICAL_THRESHOLD | `0.35` | Umbral de concepto critico |
+| LEARNING_BEGINNER_THRESHOLD | `0.40` | Umbral de nivel beginner |
+| LEARNING_DEVELOPING_THRESHOLD | `0.60` | Umbral de nivel developing |
+| LEARNING_COMPETENT_THRESHOLD | `0.80` | Umbral de nivel competent |
+| ADAPTIVE_QDRANT_TOP_K | `5` | Top-K en búsqueda adaptativa |
+| AGENT_MAX_TOOL_CALLS | `8` | Max tool calls por turno del agente |
+| AGENT_MAX_RETRIES | `2` | Reintentos del agente |
+| AGENT_INTENT_THRESHOLD | `0.6` | Umbral del clasificador de intencion |
+| AGENT_LOW_MASTERY | `0.4` | Mastery bajo (personalizar a este alumno) |
+| AGENT_HIGH_MASTERY | `0.8` | Mastery alto |
+| AGENT_MANUAL_REVIEW_THRESH | `0.5` | Umbral para revision manual |
+
 ### Math Service (Python)
 
 ```env
@@ -973,6 +993,14 @@ go run ./cmd/ragtest
 # Requiere PostgreSQL + math-service corriendo
 go test ./api/ -run TestMastery -v
 ```
+
+### Adaptive Engine (Go)
+Run: `cd api && go test ./adaptive/ -v`
+Cobertura: mastery engine, difficulty, prerequisites, recommendations, learning path, events.
+
+### Agent (Go)
+Run: `cd api && go test ./agent/ -v`
+Cobertura: decision engine, planner, tool registry, response generator.
 
 ## Footer
 
