@@ -83,12 +83,30 @@ func sanitizeText(text string) string {
 	return text
 }
 
+func canManageDocuments(role string) bool {
+	return role == "ADMIN" || role == "TEACHER"
+}
+
+func documentsListQuery(role string) string {
+	if canManageDocuments(role) {
+		return `SELECT id, filename, original_name, type, size, status, created_at
+				FROM documents WHERE uploaded_by = $1 ORDER BY created_at DESC`
+	}
+	return `SELECT id, filename, original_name, type, size, status, created_at
+			FROM documents ORDER BY created_at DESC`
+}
+
 func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Use(AuthMiddleware(cfg.JWTSecret))
 
 		r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
 			userID := r.Context().Value(UserIDKey).(string)
+			role, _ := r.Context().Value(RoleKey).(string)
+			if !canManageDocuments(role) {
+				http.Error(w, `{"error":"no autorizado: solo Admin o Profesor pueden subir documentos"}`, http.StatusForbidden)
+				return
+			}
 			r.ParseMultipartForm(50 << 20)
 
 			file, handler, err := r.FormFile("file")
@@ -137,10 +155,13 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			userID := r.Context().Value(UserIDKey).(string)
-			rows, err := db.Query(r.Context(),
-				`SELECT id, filename, original_name, type, size, status, created_at
-				 FROM documents WHERE uploaded_by = $1 ORDER BY created_at DESC`, userID,
-			)
+			role, _ := r.Context().Value(RoleKey).(string)
+			query := documentsListQuery(role)
+			args := []any{}
+			if canManageDocuments(role) {
+				args = append(args, userID)
+			}
+			rows, err := db.Query(r.Context(), query, args...)
 			if err != nil {
 				http.Error(w, `{"error":"failed to list documents"}`, http.StatusInternalServerError)
 				return
@@ -194,6 +215,11 @@ func DocumentRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 		})
 
 		r.Delete("/{id}", func(w http.ResponseWriter, r *http.Request) {
+			role, _ := r.Context().Value(RoleKey).(string)
+			if !canManageDocuments(role) {
+				http.Error(w, `{"error":"no autorizado: solo Admin o Profesor pueden eliminar documentos"}`, http.StatusForbidden)
+				return
+			}
 			docID := chi.URLParam(r, "id")
 			var filename string
 			err := db.QueryRow(r.Context(), `SELECT filename FROM documents WHERE id = $1`, docID).Scan(&filename)
