@@ -58,6 +58,35 @@ Tutor de matematicas universitarias con Inteligencia Artificial, RAG (Retrieval-
 - **Alertas academicas**: sistema de temprana deteccion de estudiantes en riesgo
 - **Configuracion**: time limit, max attempts, passing score, auto-grade, recovery threshold, alert threshold
 
+### Fase 5 — Agente Pedagógico
+- **Orquestador de agente**: agente con loop de tools que analiza el problema y ejecuta herramientas en cadena
+- **Registro de 8 herramientas**: RAG, math, verify, student, exercise, grading, hint, + eval
+- **Clasificador de intenciones**: detecta resolver, verificar, pedir pista, explicar error, evaluar
+- **Decision engine**: planifica la secuencia de tools según la intención y el contexto del alumno
+- **Citation manager**: respuestas con citas a fuentes académicas recuperadas por RAG
+- **Response generator**: genera la respuesta final consolidando resultados de las tools
+- **Learning updater**: actualiza mastery y events de aprendizaje tras cada interacción
+- **Hint tool**: hasta 3 pistas progresivas por ejercicio
+- **Evaluate tool**: evaluación de ejercicios con el motor adaptativo
+- **Guardrails**: max tool calls, max retries, umbral de intención configurables
+- **Audit logger**: registra cada ejecución del agente en `agent_execution_log`
+- **Chat frontend**: componente `agent-chat` con steps, citas y display de aprendizaje
+
+### Fase 6 — Motor de Aprendizaje Adaptativo
+- **Knowledge Map**: arbol de conceptos con prerrequisitos y niveles
+- **Mastery Engine**: cálculo de dominio por concepto con evidencia, recency weighting y status mapping (not_started, learning, developing, mastered)
+- **Error Analyzer**: clasifica errores en 10 categorías, detecta recurrencia y severidad
+- **Prerequisite Engine**: analiza prerrequisitos faltantes y recomienda remediación
+- **Difficulty Engine**: selecciona dificultad 1-5 según mastery, con clamp adaptativo
+- **Recommendation Engine**: genera recomendaciones personalizadas con explicación
+- **Learning Path Engine**: construye rutas de aprendizaje y sugiere el siguiente paso
+- **Learning Event Service**: pipeline completo de eventos (record, process, recent)
+- **Learner State Loader**: carga estado completo del alumno y progreso por concepto
+- **Búsqueda Qdrant adaptativa**: parámetros de búsqueda ajustados al estado del alumno
+- **Integración con el Agente**: el agente consulta el motor adaptativo para personalizar
+- **Analíticas de curso**: matrices de competencias y errores comunes para el docente
+- **Dashboard adaptativo frontend**: componente `adaptive-dashboard` con mapa de dominio
+
 ### Generales
 - **Gestion documental**: subir PDF/DOCX/TXT/MD, indexacion automatica en base vectorial
 - **Extraccion de metadata**: paginas (PDF), secciones (heuristica), tipos de contenido (definicion, teorema, formula, ejemplo)
