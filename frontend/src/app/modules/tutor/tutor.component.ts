@@ -20,8 +20,16 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
   template: `
     <div class="tutor-container">
       <div class="tutor-header">
-        <h1><mat-icon>school</mat-icon> Tutor Matematico</h1>
+        <h1><mat-icon>school</mat-icon> Tutor Matemático</h1>
         <p class="subtitle">Resuelve, verifica o recibe hints paso a paso</p>
+        <p class="mode-hint">
+          @switch (tutorMode()) {
+            @case ('solve') { Resolvé o verificá expresiones matemáticas paso a paso, o pedí una pista (hint) para llegar a la solución. }
+            @case ('tutor') { Un tutor interactivo te guía: respondé ejercicios y recibí feedback inmediato. }
+            @case ('practice') { Practicá ejercicios adaptados a tu nivel para reforzar conceptos. }
+            @case ('review') { Repasá temas ya trabajados para consolidar lo aprendido. }
+          }
+        </p>
       </div>
 
       <div class="mode-selector">
@@ -77,8 +85,11 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
         <div class="submit-area">
           <button mat-raised-button color="primary" (click)="submit()" [disabled]="loading() || (!latexValue() && !textQuery)">
             <mat-icon>{{ loading() ? 'sync' : 'send' }}</mat-icon>
-            {{ loading() ? 'Resolviendo...' : 'Resolver' }}
+              {{ loading() ? 'Resolviendo...' : 'Resolver' }}
           </button>
+          @if (loading() || (!latexValue() && !textQuery)) {
+              <p class="input-hint">Escribí tu consulta para habilitar el botón Resolver.</p>
+            }
         </div>
       }
 
@@ -87,7 +98,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
           @if (!sessionId()) {
             <button mat-raised-button color="primary" (click)="startSession()" [disabled]="loading()">
               <mat-icon>{{ loading() ? 'sync' : 'play_arrow' }}</mat-icon>
-              {{ loading() ? 'Iniciando...' : 'Iniciar Sesión' }}
+              {{ loading() ? 'Iniciando...' : 'Iniciar sesión' }}
             </button>
           }
 
@@ -228,7 +239,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
           @if (result()!.math_computed) {
             <div class="math-computed-badge">
               <mat-icon>calculate</mat-icon>
-              <span>Calculado con motor matematico</span>
+              <span>Calculado con el motor matemático</span>
             </div>
           }
 
@@ -273,6 +284,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
     .tutor-header h1 { color: var(--accent); font-family: 'Newsreader', serif; margin: 0 0 0.25rem 0; display: flex; align-items: center; gap: 0.5rem; }
     .tutor-header h1 mat-icon { font-size: 28px; width: 28px; height: 28px; }
     .subtitle { color: var(--text-secondary); margin: 0; font-size: 0.9rem; }
+    .mode-hint { color: var(--text-secondary); font-size: 0.85rem; margin: 0.25rem 0 1rem 0; max-width: 720px; line-height: 1.5; }
 
     .mode-selector { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .mode-selector button { display: flex; align-items: center; gap: 0.4rem; padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font-size: 0.85rem; cursor: pointer; transition: all 0.15s; }
@@ -307,6 +319,7 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
     .text-input:focus { border-color: var(--accent); }
 
     .submit-area { margin-bottom: 1.5rem; }
+    .input-hint { color: var(--text-tertiary); font-size: 0.75rem; margin: 0.5rem 0 0 0; }
     .session-section { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem; }
 
     .exercise-card { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
