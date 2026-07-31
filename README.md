@@ -684,7 +684,6 @@ Endpoints del microservicio Python (no expuestos directamente al frontend):
 | Metodo | Ruta | Descripcion |
 |--------|------|-------------|
 | POST | `/api/agent/chat` | Procesa un mensaje con el agente: planifica tools, ejecuta, genera respuesta con citas |
-| GET | `/api/agent/sessions/{id}` | Recupera una sesion del agente |
 
 ### Learning Adaptativo (requiere auth)
 | Metodo | Ruta | Descripcion |
