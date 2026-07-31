@@ -122,37 +122,54 @@ matematicarag/
 ├── api/
 │   ├── auth.go                     # Register, Login, Refresh Token
 │   ├── chat.go                     # Chat con integracion RAG automatica
+│   ├── documents.go                # Subida, listado y borrado de documentos
+│   ├── rag.go / qdrant.go          # RAG hibrido + embeddings + Qdrant
+│   ├── math.go / mathclient.go     # Proxy al math-service (SymPy)
+│   ├── math_evaluator.go           # Pipeline de evaluacion matematica estructurada
 │   ├── tutor.go                    # POST /api/tutor/solve (orquestador Fase 2)
-│   ├── intent.go                   # Clasificador de intencion (LLM + keywords)
-│   ├── mathclient.go               # Cliente HTTP para Python math service
-│   ├── math.go                     # Operaciones matematicas via SymPy
-│   ├── rag.go                      # Consultas RAG con source attribution
-│   ├── reranker.go                 # Hybrid search + reranking LLM
-│   ├── textsearch.go               # PostgreSQL full-text search
-│   ├── documents.go                # Upload, chunking, embeddings, metadata
-│   ├── qdrant.go                   # Cliente Qdrant (vectores + payload)
-│   ├── openai.go                   # Multi-proveedor LLM
-│   ├── settings.go                 # CRUD configuracion
-│   ├── users.go                    # Gestion de usuarios
-│   ├── stats.go                    # Estadisticas admin
-│   ├── history.go                  # Historial de sesiones
-│   ├── analytics.go                # Analiticas de uso
-│   ├── indexer.go                  # Re-indexacion (ADMIN)
-│   ├── migration.go                # Helpers para migracion de datos
-│   ├── middleware.go               # JWT Auth + Role middleware
-│   ├── knowledge.go                # Grafo de conceptos + prerrequisitos
-│   ├── learning.go                 # Perfiles de estudiante + mastery tracking
-│   ├── adaptive.go                 # Motor adaptativo (siguiente concepto, dificultad)
-│   ├── exercises.go                # Banco de ejercicios, generacion, validacion
-│   ├── sessions.go                 # Ciclo de vida de sesiones (crear, responder, hint, feedback)
-│   ├── errors.go                   # Taxonomia de errores + deteccion de patrones
-│   ├── teacher.go                  # Dashboard del profesor (progreso, temas, errores)
-│   ├── student_dash.go             # Dashboard del estudiante (progreso, stats)
-│   ├── questions.go                # Banco de preguntas CRUD + validacion
-│   ├── adaptive_assessment.go      # Motor de evaluacion adaptativa
-│   ├── export.go                   # Exportacion CSV (evaluaciones, cursos)
-│   ├── audit.go                    # Registro de auditoria + versionado
-│   └── learning_test.go            # Tests de integracion (stubs)
+│   ├── intent.go                   # Clasificador de intencion
+│   ├── sessions.go                 # Sesiones tutor adaptativo
+│   ├── exercises.go                # Banco de ejercicios + generacion adaptativa
+│   ├── learning.go                 # Endpoints /api/learning/* (perfil, mastery, eventos, rutas)
+│   ├── student.go / teacher.go     # Dashboards de estudiante y profesor
+│   ├── dashboards.go               # /api/dashboard/student y /api/dashboard/teacher
+│   ├── assessments.go              # Evaluaciones (Fase 4)
+│   ├── questions.go / grading.go   # Banco de preguntas + calificacion
+│   ├── adaptive_assessment.go      # Evaluaciones adaptativas
+│   ├── analytics.go / analytics_v2.go  # Analiticas
+│   ├── critical_concepts.go        # Analitica de conceptos criticos
+│   ├── recovery.go                 # Planes de recuperacion
+│   ├── alerts.go                   # Alertas academicas
+│   ├── export.go                   # Exportacion CSV
+│   ├── audit.go                    # Auditoria
+│   ├── agent_routes.go             # POST /api/agent/chat
+│   ├── settings.go / stats.go      # Panel admin
+│   ├── middleware.go / circuit_breaker.go / metrics.go   # Resiliencia y observabilidad
+│   ├── adaptive/                   # Motor de Aprendizaje Adaptativo (Fase 6)
+│   │   ├── engine.go               # Core + wiring de los 8 engines
+│   │   ├── mastery.go              # Mastery engine
+│   │   ├── knowledge_map.go        # Knowledge map + prerrequisitos
+│   │   ├── errors.go               # Error analyzer
+│   │   ├── prerequisites.go        # Prerequisite engine
+│   │   ├── difficulty.go           # Difficulty engine
+│   │   ├── recommendations.go      # Recommendation engine
+│   │   ├── learning_path.go        # Learning path engine
+│   │   ├── events.go               # Learning event service
+│   │   ├── state.go                # Learner state loader
+│   │   ├── analytics.go            # Progreso y analiticas de curso
+│   │   └── qdrant.go               # Búsqueda adaptativa en Qdrant
+│   └── agent/                      # Agente Pedagogico (Fase 5)
+│       ├── agent.go                # Orquestador + loop de tools
+│       ├── tool_registry.go        # Registro de 8 herramientas
+│       ├── decision_engine.go      # Planificacion de secuencia de tools
+│       ├── planner.go              # Plan de ejecucion
+│       ├── rag_tool.go / math_tool.go / verify_tool.go / student_tool.go
+│       ├── exercise_tool.go / grading_tool.go / hint_tool.go / evaluate_tool.go
+│       ├── citation_manager.go     # Citas a fuentes
+│       ├── response_generator.go   # Generacion de respuesta final
+│       ├── learning_updater.go     # Actualizacion de mastery y eventos
+│       ├── audit_logger.go         # Registro de ejecuciones
+│       └── intent_classifier.go    # Clasificacion de intencion del agente
 ├── math-service/
 │   ├── app.py                      # Flask API (12 endpoints matematicos)
 │   ├── Dockerfile                  # Python 3.11-slim + SymPy
