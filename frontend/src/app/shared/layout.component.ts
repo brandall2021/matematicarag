@@ -53,6 +53,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
           }
           <a routerLink="/my-progress" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>trending_up</mat-icon><span>Mi Progreso</span></a>
           <a routerLink="/aprendizaje" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>insights</mat-icon><span>Aprendizaje</span></a>
+          <a routerLink="/logros" routerLinkActive="active" class="nav-item" (click)="sidebarOpen.set(false)"><mat-icon>emoji_events</mat-icon><span>Logros</span></a>
 
           @if (auth.hasRole('ADMIN', 'TEACHER')) {
             <div class="nav-section-label">Gestión</div>

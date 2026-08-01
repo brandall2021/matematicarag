@@ -25,6 +25,7 @@ export const routes: Routes = [
       { path: 'analytics', loadComponent: () => import('./modules/analytics/analytics.component').then(m => m.AnalyticsComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'TEACHER'] } },
       { path: 'my-progress', loadComponent: () => import('./modules/student-progress/student-progress.component').then(m => m.StudentProgressComponent) },
       { path: 'aprendizaje', loadComponent: () => import('./modules/adaptive-dashboard/adaptive-dashboard.component').then(m => m.AdaptiveDashboardComponent) },
+      { path: 'logros', loadComponent: () => import('./modules/gamification/gamification.component').then(m => m.GamificationComponent) },
       { path: 'teacher', loadComponent: () => import('./modules/teacher-dashboard/teacher-dashboard.component').then(m => m.TeacherDashboardComponent), canActivate: [roleGuard], data: { roles: ['ADMIN', 'TEACHER'] } },
     ]
   },
