@@ -670,7 +670,7 @@ func Migrate(db *pgxpool.Pool) error {
 			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			points INTEGER NOT NULL,
 			source VARCHAR(100) NOT NULL,
-			concept_id UUID REFERENCES concepts(id) ON DELETE SET NULL,
+			concept_id VARCHAR(100) REFERENCES concepts(id) ON DELETE SET NULL,
 			metadata JSONB,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
