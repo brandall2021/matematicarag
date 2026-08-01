@@ -113,7 +113,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
       font-size: 0.8rem;
       box-shadow: var(--shadow-md);
     }
-    .offline-banner mat-icon { color: var(--warn); flex-shrink: 0; }
+    .offline-banner mat-icon { color: var(--danger); flex-shrink: 0; }
     .offline-retry { margin-left: auto; }
 
     .sidebar {
