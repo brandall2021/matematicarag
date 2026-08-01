@@ -15,7 +15,7 @@
       "installMode": "lazy",
       "updateMode": "prefetch",
       "resources": {
-        "files": ["/assets/**", "/icons/**"]
+        "files": ["/assets/**", "/icons/**", "/media/**"]
       }
     }
   ],
