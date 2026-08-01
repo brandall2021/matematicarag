@@ -92,7 +92,11 @@ func TouchStreak(ctx context.Context, db *pgxpool.Pool, studentID string) error 
 				WHEN student_streaks.last_active_date = ($2::date - INTERVAL '1 day')::date THEN student_streaks.current_streak + 1
 				ELSE 1
 			END,
-			best_streak = GREATEST(student_streaks.best_streak, current_streak),
+			best_streak = GREATEST(student_streaks.best_streak, CASE
+				WHEN student_streaks.last_active_date = $2 THEN student_streaks.current_streak
+				WHEN student_streaks.last_active_date = ($2::date - INTERVAL '1 day')::date THEN student_streaks.current_streak + 1
+				ELSE 1
+			END),
 			last_active_date = $2,
 			updated_at = NOW()`,
 		studentID, today)
