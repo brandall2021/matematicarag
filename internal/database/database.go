@@ -665,6 +665,41 @@ func Migrate(db *pgxpool.Pool) error {
 			created_at TIMESTAMPTZ DEFAULT NOW()
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_math_step_results_attempt ON math_step_results(attempt_id)`,
+		`CREATE TABLE IF NOT EXISTS student_points (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			points INTEGER NOT NULL,
+			source VARCHAR(100) NOT NULL,
+			concept_id UUID REFERENCES concepts(id) ON DELETE SET NULL,
+			metadata JSONB,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_points_student ON student_points(student_id)`,
+		`CREATE TABLE IF NOT EXISTS achievements (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			code VARCHAR(100) UNIQUE NOT NULL,
+			title VARCHAR(255) NOT NULL,
+			description TEXT NOT NULL,
+			icon VARCHAR(50) NOT NULL DEFAULT 'emoji_events',
+			points INTEGER NOT NULL DEFAULT 0,
+			criteria JSONB NOT NULL DEFAULT '{}',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS student_achievements (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			achievement_id UUID NOT NULL REFERENCES achievements(id) ON DELETE CASCADE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			UNIQUE(student_id, achievement_id)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_student_achievements_student ON student_achievements(student_id)`,
+		`CREATE TABLE IF NOT EXISTS student_streaks (
+			student_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+			current_streak INTEGER NOT NULL DEFAULT 0,
+			best_streak INTEGER NOT NULL DEFAULT 0,
+			last_active_date DATE,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
 	}
 
 	for _, m := range migrations {
