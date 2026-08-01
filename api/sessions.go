@@ -252,10 +252,28 @@ func SubmitAnswer(db *pgxpool.Pool, cfg *config.Config, studentID string, req *A
 		studentID, exercise.ConceptID).Scan(&masteryBefore)
 
 	now := time.Now()
-	db.Exec(ctx,
+	_, insertErr := db.Exec(ctx,
 		`INSERT INTO exercise_attempts (session_id, student_id, exercise_id, answer, correct, score, hints_used, first_error_step, time_seconds, completed_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8)`,
 		req.SessionID, studentID, req.ExerciseID, req.Answer, correct, score, hintsUsed, firstErrorStep, now)
+	if insertErr == nil {
+		go func() {
+			ctx2 := context.Background()
+			points := 5
+			switch {
+			case exercise.Difficulty >= 4:
+				points = 15
+			case exercise.Difficulty == 3:
+				points = 10
+			}
+			if correct {
+				_ = RecordActivity(ctx2, db, studentID, "exercise_solved", &exercise.ConceptID, points, map[string]any{"difficulty": exercise.Difficulty})
+			} else {
+				_ = RecordActivity(ctx2, db, studentID, "exercise_attempt", &exercise.ConceptID, 2, map[string]any{"difficulty": exercise.Difficulty})
+			}
+			_ = TouchStreak(ctx2, db, studentID)
+		}()
+	}
 
 	if !correct && firstErrorStep > 0 && errorType != "" {
 		RecordError(db, studentID, exercise.ConceptID, errorType, "")

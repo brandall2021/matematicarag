@@ -804,6 +804,11 @@ func SubmitAssessment(db *pgxpool.Pool, cfg *config.Config, studentID, assessmen
 		return nil, err
 	}
 
+	if passed {
+		_ = RecordActivity(ctx, db, studentID, "assessment_passed", nil, 30, map[string]any{"assessment_id": assessmentID})
+		_ = CheckAchievements(ctx, db, studentID)
+	}
+
 	return &map[string]interface{}{
 		"student_assessment_id": sa.ID,
 		"total_score":           totalPoints,
