@@ -1,16 +1,10 @@
-from sympy import sympify, simplify
-from sympy.parsing.latex import parse_latex
+from sympy import simplify
+from .parser import safe_parse
 
 def verify_result(expression: str, expected: str, operation: str = '') -> dict:
     try:
-        if '\\' in expression or '{' in expression:
-            expr_actual = parse_latex(expression)
-        else:
-            expr_actual = sympify(expression)
-        if '\\' in expected or '{' in expected:
-            expr_expected = parse_latex(expected)
-        else:
-            expr_expected = sympify(expected)
+        expr_actual = safe_parse(expression)
+        expr_expected = safe_parse(expected)
         diff = simplify(expr_actual - expr_expected)
         verified = diff == 0
         return {
