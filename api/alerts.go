@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/brandall2021/matematicarag/internal/config"
@@ -97,6 +98,14 @@ func CreateAlert(db *pgxpool.Pool, studentID, alertType, severity, title, messag
 	if err != nil {
 		return nil, err
 	}
+
+	if err := CreateNotification(ctx, db, studentID, "academic_alert",
+		"Alerta académica",
+		"Tenés una nueva alerta académica. Revisala para no perderte el detalle.",
+		"/my-progress"); err != nil {
+		log.Printf("[NOTIFY] academic_alert failed: %v", err)
+	}
+
 	return &alert, nil
 }
 

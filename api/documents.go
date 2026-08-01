@@ -322,6 +322,25 @@ func processDocument(db *pgxpool.Pool, docID, filePath, ext, originalName string
 	if allOK {
 		db.Exec(ctx, `UPDATE documents SET status = 'indexed' WHERE id = $1`, docID)
 		log.Printf("[DOCS] document %s indexed successfully (%d chunks)", docID, len(chunks))
+
+		rows, err := db.Query(ctx, `SELECT id FROM users WHERE role IN ('TEACHER','ADMIN')`)
+		if err != nil {
+			log.Printf("[NOTIFY] document_indexed failed to query teachers/admins: %v", err)
+		} else {
+			defer rows.Close()
+			for rows.Next() {
+				var teacherID string
+				if err := rows.Scan(&teacherID); err != nil {
+					continue
+				}
+				if err := CreateNotification(ctx, db, teacherID, "document_indexed",
+					"Documento indexado",
+					"Un documento fue indexado en la base vectorial.",
+					"/documents"); err != nil {
+					log.Printf("[NOTIFY] document_indexed failed: %v", err)
+				}
+			}
+		}
 	} else {
 		db.Exec(ctx, `UPDATE documents SET status = 'error' WHERE id = $1`, docID)
 		log.Printf("[DOCS] document %s indexing failed (some upserts failed)", docID)

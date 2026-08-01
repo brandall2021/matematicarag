@@ -809,6 +809,13 @@ func SubmitAssessment(db *pgxpool.Pool, cfg *config.Config, studentID, assessmen
 		_ = CheckAchievements(ctx, db, studentID)
 	}
 
+	if err := CreateNotification(ctx, db, studentID, "assessment_graded",
+		"Evaluación calificada",
+		"Tu evaluación fue calificada. Revisá el resultado en Evaluaciones.",
+		"/assessment"); err != nil {
+		log.Printf("[NOTIFY] assessment_graded failed: %v", err)
+	}
+
 	return &map[string]interface{}{
 		"student_assessment_id": sa.ID,
 		"total_score":           totalPoints,

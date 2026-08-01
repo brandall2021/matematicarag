@@ -119,6 +119,7 @@ func main() {
 			r.Route("/recovery", api.RecoveryRoutes(db, cfg))
 			r.Route("/alerts", api.AlertRoutes(db, cfg))
 			r.Route("/gamification", api.GamificationRoutes(db, cfg))
+			r.Route("/notifications", api.NotificationsRoutes(db, cfg))
 			r.Route("/export", api.ExportRoutes(db))
 			r.Route("/audit", api.AuditRoutes(db))
 		})

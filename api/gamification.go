@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -177,6 +178,13 @@ func CheckAchievements(ctx context.Context, db *pgxpool.Pool, studentID string) 
 				studentID, a.ID)
 			if err == nil {
 				RecordActivity(ctx, db, studentID, "achievement:"+a.Code, nil, a.Points, map[string]any{"achievement_id": a.ID})
+
+				if err := CreateNotification(ctx, db, studentID, "achievement_unlocked",
+					"¡Logro desbloqueado!",
+					"Desbloqueaste el logro: "+a.Title,
+					"/logros"); err != nil {
+					log.Printf("[NOTIFY] achievement_unlocked failed: %v", err)
+				}
 			}
 		}
 	}
