@@ -3,6 +3,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { ThemeService } from '../core/services/theme.service';
 import { OfflineService } from '../core/services/offline.service';
+import { NotificationCenterComponent } from '../modules/notifications/notification-center.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -10,7 +11,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatButtonModule, MatIconModule, MatTooltipModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatButtonModule, MatIconModule, MatTooltipModule, NotificationCenterComponent],
   template: `
     <div class="layout">
       @if (offline.isOffline()) {
@@ -71,6 +72,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
             <span class="user-name">{{ auth.currentUser()?.name || 'Usuario' }}</span>
           </div>
           <div class="footer-actions">
+            <app-notification-center></app-notification-center>
             <button mat-icon-button (click)="themeService.toggle()" class="theme-btn" aria-label="Cambiar tema" matTooltip="Cambiar tema">
               <mat-icon>{{ themeService.currentTheme() === 'dark' ? 'light_mode' : 'dark_mode' }}</mat-icon>
             </button>
