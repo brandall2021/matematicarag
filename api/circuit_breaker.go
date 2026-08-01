@@ -206,6 +206,10 @@ func retryWithBackoff(cfg RetryConfig, fn func() error) error {
 		if err == nil {
 			return nil
 		}
+		var clientErr *MathClientError
+		if errors.As(err, &clientErr) {
+			return clientErr
+		}
 		lastErr = err
 	}
 	return lastErr

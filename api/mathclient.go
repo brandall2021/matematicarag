@@ -8,10 +8,30 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/brandall2021/matematicarag/internal/config"
 )
+
+type MathClientError struct {
+	StatusCode int
+	Reason     string
+}
+
+func (e *MathClientError) Error() string {
+	return fmt.Sprintf("[MATH] service rejected request (%d): %s", e.StatusCode, e.Reason)
+}
+
+func extractMathError(body []byte) string {
+	var errResp struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(body, &errResp) == nil && errResp.Error != "" {
+		return errResp.Error
+	}
+	return strings.TrimSpace(string(body))
+}
 
 type MathClient struct {
 	baseURL       string
@@ -103,6 +123,11 @@ func (c *MathClient) post(path string, body interface{}) ([]byte, error) {
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return fmt.Errorf("[MATH] read response: %w", err)
+		}
+
+		if resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != http.StatusRequestTimeout {
+			RecordMathRequest(duration, true)
+			return &MathClientError{StatusCode: resp.StatusCode, Reason: extractMathError(bodyBytes)}
 		}
 
 		if resp.StatusCode >= 500 {

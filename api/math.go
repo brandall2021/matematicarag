@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/brandall2021/matematicarag/internal/config"
@@ -33,6 +34,12 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			result, err := mathClient.Evaluate(req.Expression)
 			if err != nil {
+				var clientErr *MathClientError
+				if errors.As(err, &clientErr) {
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(map[string]string{"error": "La expresión no se pudo evaluar: " + clientErr.Reason})
+					return
+				}
 				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
 				return
 			}
