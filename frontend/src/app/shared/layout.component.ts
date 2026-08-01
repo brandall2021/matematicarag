@@ -2,6 +2,7 @@ import { Component, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../core/services/auth.service';
 import { ThemeService } from '../core/services/theme.service';
+import { OfflineService } from '../core/services/offline.service';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -12,6 +13,13 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   imports: [RouterOutlet, RouterLink, RouterLinkActive, MatButtonModule, MatIconModule, MatTooltipModule],
   template: `
     <div class="layout">
+      @if (offline.isOffline()) {
+        <div class="offline-banner" role="status">
+          <mat-icon>cloud_off</mat-icon>
+          <span>Estás sin conexión. Algunas funciones pueden no estar disponibles.</span>
+          <button mat-button class="offline-retry" (click)="offline.retry()">Volver a intentar</button>
+        </div>
+      }
       <button class="hamburger" (click)="sidebarOpen.set(!sidebarOpen())" aria-label="Alternar menú">
         <mat-icon>{{ sidebarOpen() ? 'close' : 'menu' }}</mat-icon>
       </button>
@@ -88,6 +96,25 @@ import { MatTooltipModule } from '@angular/material/tooltip';
     .hamburger:hover { background: var(--surface-elevated); border-color: var(--accent); }
     .hamburger mat-icon { font-size: 22px; }
     .sidebar-backdrop { display: none; }
+
+    .offline-banner {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1300;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      font-size: 0.8rem;
+      box-shadow: var(--shadow-md);
+    }
+    .offline-banner mat-icon { color: var(--warn); flex-shrink: 0; }
+    .offline-retry { margin-left: auto; }
 
     .sidebar {
       width: 220px;
@@ -196,5 +223,5 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 })
 export class LayoutComponent {
   sidebarOpen = signal(false);
-  constructor(public auth: AuthService, public themeService: ThemeService) {}
+  constructor(public auth: AuthService, public themeService: ThemeService, public offline: OfflineService) {}
 }
