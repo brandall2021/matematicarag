@@ -41,6 +41,31 @@ type GamificationSummary struct {
 	RecentActivities []PointActivity `json:"recent_activities"`
 }
 
+func SeedAchievements(ctx context.Context, db *pgxpool.Pool) error {
+	achievements := []struct {
+		Code, Title, Description, Icon string
+		Points                         int
+	}{
+		{"first_exercise", "Primer paso", "Resolviste tu primer ejercicio.", "check_circle", 10},
+		{"ten_exercises", "En racha", "Resolviste 10 ejercicios.", "fitness_center", 25},
+		{"streak_3", "Constancia", "Practicaste 3 días seguidos.", "local_fire_department", 30},
+		{"streak_7", "Semana completa", "Practicaste 7 días seguidos.", "whatshot", 75},
+		{"perfect_assessment", "Perfecto", "Aprobaste una evaluación con 100 puntos.", "stars", 50},
+		{"concept_mastered", "Dominio", "Llegaste a nivel 'mastered' en un concepto.", "military_tech", 60},
+	}
+	for _, a := range achievements {
+		_, err := db.Exec(ctx, `
+			INSERT INTO achievements (code, title, description, icon, points, criteria)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			ON CONFLICT (code) DO NOTHING`,
+			a.Code, a.Title, a.Description, a.Icon, a.Points, json.RawMessage(`{"code":"`+a.Code+`"}`))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func levelName(level int) string {
 	switch {
 	case level >= 10:

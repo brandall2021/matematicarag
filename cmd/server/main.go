@@ -38,6 +38,10 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	if err := api.SeedAchievements(context.Background(), db); err != nil {
+		log.Printf("WARN: failed to seed achievements: %v", err)
+	}
+
 	metricsMW := api.NewMetricsMiddleware()
 
 	apiRouter := chi.NewRouter()
@@ -114,6 +118,7 @@ func main() {
 			r.Route("/analytics/v2", api.AnalyticsV2Routes(db, cfg))
 			r.Route("/recovery", api.RecoveryRoutes(db, cfg))
 			r.Route("/alerts", api.AlertRoutes(db, cfg))
+			r.Route("/gamification", api.GamificationRoutes(db, cfg))
 			r.Route("/export", api.ExportRoutes(db))
 			r.Route("/audit", api.AuditRoutes(db))
 		})
