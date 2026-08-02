@@ -34,10 +34,10 @@ func extractMathError(body []byte) string {
 }
 
 type MathClient struct {
-	baseURL       string
-	httpClient    *http.Client
+	baseURL        string
+	httpClient     *http.Client
 	circuitBreaker *CircuitBreaker
-	retryCfg      RetryConfig
+	retryCfg       RetryConfig
 }
 
 type MathResult struct {
@@ -315,6 +315,34 @@ type expandRequest struct {
 func (c *MathClient) Expand(expression string) (*MathResult, error) {
 	var result MathResult
 	respBody, err := c.post("/api/math/expand", expandRequest{Expression: expression})
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("[MATH] decode response: %w", err)
+	}
+	return &result, nil
+}
+
+type plotRequest struct {
+	Expression string  `json:"expression"`
+	XMin       float64 `json:"xMin"`
+	XMax       float64 `json:"xMax"`
+}
+
+type PlotResult struct {
+	Success    bool            `json:"success"`
+	Expression string          `json:"expression,omitempty"`
+	Variable   string          `json:"variable,omitempty"`
+	XMin       float64         `json:"xmin,omitempty"`
+	XMax       float64         `json:"xmax,omitempty"`
+	Points     [][]interface{} `json:"points,omitempty"`
+	Error      string          `json:"error,omitempty"`
+}
+
+func (c *MathClient) Plot(expression string, xmin, xmax float64) (*PlotResult, error) {
+	var result PlotResult
+	respBody, err := c.post("/api/math/plot", plotRequest{Expression: expression, XMin: xmin, XMax: xmax})
 	if err != nil {
 		return nil, err
 	}

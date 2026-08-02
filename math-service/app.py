@@ -9,6 +9,7 @@ from engine.algebra import simplify_expr, factor_expr, expand_expr
 from engine.matrices import matrix_operation
 from engine.verify import verify_result
 from engine.arithmetic import basic_evaluate as evaluate_expression
+from engine.plot import plot_expression
 
 app = Flask(__name__)
 _allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:8009').split(',')
@@ -115,6 +116,32 @@ def math_expand():
     result = expand_expr(expression)
     latex = str(result)
     return jsonify({'success': True, 'result': latex, 'latex': latex})
+
+
+@route('/math/plot', methods=['POST'])
+@with_timeout
+def math_plot():
+    data = request.get_json()
+    expression = _input(data, 'expression')
+    if not expression:
+        return jsonify({'success': False, 'error': 'Expression is required'}), 400
+
+    def _num(key, default):
+        val = default
+        for k, v in (data.items() if isinstance(data, dict) else []):
+            if k.lower() == key.lower():
+                val = v
+                break
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            raise ValueError('Invalid value for %s' % key)
+
+    xmin = _num('xmin', -10.0)
+    xmax = _num('xmax', 10.0)
+    result = plot_expression(expression, xmin=xmin, xmax=xmax)
+    result['success'] = True
+    return jsonify(result)
 
 
 @route('/math/differentiate', methods=['POST'])

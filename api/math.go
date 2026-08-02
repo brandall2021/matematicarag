@@ -167,5 +167,35 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(result)
 		})
+
+		r.Post("/plot", func(w http.ResponseWriter, r *http.Request) {
+			var req MathRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
+				return
+			}
+			if req.Expression == "" {
+				http.Error(w, `{"error":"expression is required"}`, http.StatusBadRequest)
+				return
+			}
+			xmin, xmax := -10.0, 10.0
+			if req.XMin != 0 || req.XMax != 0 {
+				xmin, xmax = req.XMin, req.XMax
+			}
+			result, err := mathClient.Plot(req.Expression, xmin, xmax)
+			if err != nil {
+				var clientErr *MathClientError
+				if errors.As(err, &clientErr) {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					json.NewEncoder(w).Encode(map[string]string{"error": "La expresión no se pudo graficar: " + clientErr.Reason})
+					return
+				}
+				mathError(w, err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(result)
+		})
 	}
 }

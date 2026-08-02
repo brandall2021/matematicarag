@@ -1,4 +1,4 @@
-import { Component, signal, ViewChild, ElementRef, AfterViewInit, OnDestroy, NgZone } from '@angular/core';
+import { Component, signal, ViewChild, ElementRef, AfterViewInit, OnDestroy, NgZone, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/services/api.service';
@@ -52,6 +52,29 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
             <span>Calcular</span>
           }
         </button>
+        <button class="calc-btn plot-btn" (click)="plot()" [disabled]="!latexValue() || plotLoading()">
+          @if (plotLoading()) {
+            <span class="calc-spinner plot-spinner"></span>
+            <span>Graficando</span>
+          } @else {
+            <mat-icon>show_chart</mat-icon>
+            <span>Graficar</span>
+          }
+        </button>
+      </div>
+
+      <div class="plot-toolbar">
+        <label class="range-field">
+          <span class="range-label">X desde</span>
+          <input type="number" step="any" [value]="xMin()" (input)="setXMin($event)" />
+        </label>
+        <label class="range-field">
+          <span class="range-label">X hasta</span>
+          <input type="number" step="any" [value]="xMax()" (input)="setXMax($event)" />
+        </label>
+        @if (plotPoints().length) {
+          <button class="plot-clear" (click)="clearPlot()">Quitar gráfico</button>
+        }
       </div>
 
       @if (result()) {
@@ -61,6 +84,25 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
             <h3>Resultado</h3>
           </div>
           <div class="result-content" [innerHTML]="result() | renderMath"></div>
+        </div>
+      }
+
+      @if (plotError()) {
+        <div class="plot-error">
+          <mat-icon class="plot-error-icon">error_outline</mat-icon>
+          <span>{{ plotError() }}</span>
+        </div>
+      }
+
+      @if (plotPoints().length) {
+        <div class="plot-card">
+          <div class="plot-card-header">
+            <mat-icon class="plot-icon">show_chart</mat-icon>
+            <h3>Gráfica de {{ latexValue() }}</h3>
+          </div>
+          <div class="plot-canvas-wrap">
+            <canvas #plotCanvas></canvas>
+          </div>
         </div>
       }
     </div>
@@ -199,6 +241,117 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    .plot-btn {
+      background: transparent;
+      color: var(--accent);
+      border: 2px solid var(--accent);
+    }
+    .plot-btn:hover:not(:disabled) {
+      background: var(--accent-muted);
+      color: var(--accent-hover);
+      border-color: var(--accent-hover);
+    }
+    .plot-btn .plot-spinner {
+      border-color: var(--accent-muted);
+      border-top-color: var(--accent);
+    }
+
+    .plot-toolbar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      margin: calc(-1 * var(--space-sm)) 0 var(--space-md);
+      flex-wrap: wrap;
+    }
+    .range-field {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 0.35rem var(--space-sm);
+    }
+    .range-label {
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .range-field input {
+      width: 6.5rem;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: var(--font-mono, monospace);
+      font-size: 0.85rem;
+      padding: 0.15rem 0;
+    }
+    .plot-clear {
+      margin-left: auto;
+      background: transparent;
+      border: none;
+      color: var(--text-tertiary);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0.25rem 0.5rem;
+    }
+    .plot-clear:hover { color: var(--danger); }
+
+    .plot-error {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: var(--danger-muted);
+      color: var(--danger);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      font-size: 0.88rem;
+      margin-bottom: var(--space-md);
+    }
+    .plot-error-icon { font-size: 18px; width: 18px; height: 18px; }
+
+    .plot-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-sm);
+      animation: fadeUp 0.25s ease;
+      overflow: hidden;
+    }
+    .plot-card-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-md) var(--space-lg);
+      border-bottom: 1px solid var(--border-light);
+    }
+    .plot-icon { color: var(--accent); font-size: 20px; width: 20px; height: 20px; }
+    .plot-card-header h3 {
+      font-family: var(--font-serif);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .plot-canvas-wrap {
+      padding: var(--space-md);
+    }
+    .plot-canvas-wrap canvas {
+      display: block;
+      width: 100%;
+      height: 320px;
+      border-radius: var(--radius-md);
+    }
+
     .result-card {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -239,14 +392,20 @@ MathfieldElement.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@0.110.0
 })
 export class MathComponent implements AfterViewInit, OnDestroy {
   @ViewChild('mathField') mathFieldRef!: ElementRef<any>;
+  @ViewChild('plotCanvas') plotCanvasRef!: ElementRef<HTMLCanvasElement>;
 
   result = signal('');
   latexValue = signal('');
   loading = signal(false);
+  plotPoints = signal<Array<[number, number | null]>>([]);
+  plotError = signal('');
+  plotLoading = signal(false);
+  xMin = signal(-10);
+  xMax = signal(10);
 
   private mf: any = null;
 
-  constructor(private api: ApiService, private zone: NgZone) {}
+  constructor(private api: ApiService, private zone: NgZone, private elRef: ElementRef) {}
 
   ngAfterViewInit() {
     setTimeout(() => {
@@ -263,17 +422,40 @@ export class MathComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  @HostListener('window:resize')
+  onResize() {
+    if (this.plotPoints().length) {
+      setTimeout(() => this.drawPlot(), 0);
+    }
+  }
+
   private handleInput = () => {
     this.zone.run(() => {
       if (this.mf) {
-        this.latexValue.set(this.mf.value || '');
+        this.applyLatex(this.mf.value || '');
       }
     });
   };
 
   onInput(event: any) {
-    const val = event.target?.value || this.mf?.value || '';
-    this.latexValue.set(val);
+    this.applyLatex(event.target?.value || this.mf?.value || '');
+  }
+
+  private applyLatex(val: string) {
+    if (this.latexValue() !== val) {
+      this.latexValue.set(val);
+      this.clearPlot();
+    }
+  }
+
+  setXMin(event: any) {
+    const v = parseFloat(event?.target?.value);
+    if (!isNaN(v)) this.xMin.set(v);
+  }
+
+  setXMax(event: any) {
+    const v = parseFloat(event?.target?.value);
+    if (!isNaN(v)) this.xMax.set(v);
   }
 
   calculate() {
@@ -293,5 +475,190 @@ export class MathComponent implements AfterViewInit, OnDestroy {
         this.result.set(err.error?.error || 'Error al calcular');
       }
     });
+  }
+
+  plot() {
+    const expr = this.latexValue();
+    if (!expr) return;
+
+    this.plotLoading.set(true);
+    this.plotError.set('');
+
+    this.api.mathPlot(expr, this.xMin(), this.xMax()).subscribe({
+      next: (res: any) => {
+        this.plotLoading.set(false);
+        if (res && Array.isArray(res.points) && res.points.length) {
+          this.plotPoints.set(res.points);
+          setTimeout(() => this.drawPlot(), 0);
+        } else {
+          this.plotError.set(res?.error || 'No se pudo graficar la expresión');
+        }
+      },
+      error: (err: any) => {
+        this.plotLoading.set(false);
+        this.plotError.set(err.error?.error || 'Error al graficar');
+      }
+    });
+  }
+
+  clearPlot() {
+    this.plotPoints.set([]);
+    this.plotError.set('');
+  }
+
+  private niceStep(range: number, targetTicks = 8): number {
+    if (!isFinite(range) || range <= 0) return 1;
+    const rough = range / targetTicks;
+    const mag = Math.pow(10, Math.floor(Math.log10(rough)));
+    const norm = rough / mag;
+    const step = norm >= 5 ? 10 : norm >= 2 ? 5 : norm >= 1 ? 2 : 1;
+    return step * mag;
+  }
+
+  private formatTick(v: number): string {
+    const a = Math.abs(v);
+    if (a >= 1e6 || (a > 0 && a < 1e-3)) return v.toExponential(1);
+    return String(Math.round(v * 100) / 100);
+  }
+
+  private cssVar(name: string, fallback: string): string {
+    try {
+      const val = getComputedStyle(this.elRef.nativeElement).getPropertyValue(name).trim();
+      return val || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  private drawPlot() {
+    const canvas = this.plotCanvasRef?.nativeElement;
+    if (!canvas) return;
+    const points = this.plotPoints();
+    if (!points.length) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    const W = Math.max(rect.width, 40);
+    const H = Math.max(rect.height, 40);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const pad = { l: 56, r: 14, t: 14, b: 30 };
+    const pw = W - pad.l - pad.r;
+    const ph = H - pad.t - pad.b;
+    const xmin = this.xMin();
+    const xmax = this.xMax();
+
+    const finite = points.filter(p => p[1] !== null && isFinite(p[1] as number));
+    let ymin: number;
+    let ymax: number;
+    if (finite.length >= 20) {
+      const ys = finite.map(p => p[1] as number).sort((a, b) => a - b);
+      const t = Math.floor(ys.length * 0.025);
+      ymin = ys[t];
+      ymax = ys[ys.length - 1 - t];
+    } else if (finite.length) {
+      const ys = finite.map(p => p[1] as number);
+      ymin = Math.min(...ys);
+      ymax = Math.max(...ys);
+    } else {
+      ymin = -10;
+      ymax = 10;
+    }
+    if (!isFinite(ymin) || !isFinite(ymax)) { ymin = -10; ymax = 10; }
+    if (ymax - ymin < 1e-9) { ymin -= 1; ymax += 1; }
+    const ypad = (ymax - ymin) * 0.1 || 1;
+    ymin -= ypad;
+    ymax += ypad;
+
+    const sx = (x: number) => pad.l + ((x - xmin) / (xmax - xmin)) * pw;
+    const sy = (y: number) => pad.t + (1 - (y - ymin) / (ymax - ymin)) * ph;
+
+    const bg = this.cssVar('--surface', '#ffffff');
+    const grid = this.cssVar('--border-light', '#e4e6ef');
+    const axis = this.cssVar('--text-secondary', '#5a5a72');
+    const text = this.cssVar('--text', '#1a1a2e');
+    const curve = this.cssVar('--accent', '#b8940a');
+
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.font = '11px "JetBrains Mono", monospace';
+
+    const xStep = this.niceStep(xmax - xmin);
+    for (let x = Math.ceil(xmin / xStep) * xStep; x <= xmax; x += xStep) {
+      const px = sx(x);
+      ctx.strokeStyle = grid;
+      ctx.beginPath();
+      ctx.moveTo(px, pad.t);
+      ctx.lineTo(px, pad.t + ph);
+      ctx.stroke();
+      ctx.fillStyle = text;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillText(this.formatTick(x), px, pad.t + ph + 6);
+    }
+
+    const yStep = this.niceStep(ymax - ymin);
+    for (let y = Math.ceil(ymin / yStep) * yStep; y <= ymax; y += yStep) {
+      const py = sy(y);
+      ctx.strokeStyle = grid;
+      ctx.beginPath();
+      ctx.moveTo(pad.l, py);
+      ctx.lineTo(pad.l + pw, py);
+      ctx.stroke();
+      ctx.fillStyle = text;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(this.formatTick(y), pad.l - 6, py);
+    }
+
+    ctx.strokeStyle = axis;
+    ctx.lineWidth = 1.5;
+    if (xmin <= 0 && xmax >= 0) {
+      const x0 = sx(0);
+      ctx.beginPath();
+      ctx.moveTo(x0, pad.t);
+      ctx.lineTo(x0, pad.t + ph);
+      ctx.stroke();
+    }
+    if (ymin <= 0 && ymax >= 0) {
+      const y0 = sy(0);
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y0);
+      ctx.lineTo(pad.l + pw, y0);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = curve;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    let drawing = false;
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      const pyv = p[1];
+      if (pyv === null || !isFinite(pyv)) {
+        drawing = false;
+        continue;
+      }
+      const px = sx(p[0]);
+      const py = sy(pyv);
+      if (drawing) {
+        const prev = points[i - 1];
+        if (prev && prev[1] !== null && Math.abs(sy(prev[1]) - py) > ph * 0.9) {
+          ctx.stroke();
+          ctx.beginPath();
+        }
+        ctx.lineTo(px, py);
+      } else {
+        ctx.moveTo(px, py);
+        drawing = true;
+      }
+    }
+    ctx.stroke();
   }
 }
