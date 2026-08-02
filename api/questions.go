@@ -88,7 +88,7 @@ func CreateQuestionHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFun
 
 		var id string
 		err := db.QueryRow(r.Context(),
-			`INSERT INTO questions (statement, latex, question_type, difficulty, concept_id,
+			`INSERT INTO question_bank (statement, latex, question_type, difficulty, concept_id,
 			 competencies, expected_answer, answer_options, explanation, explanation_latex,
 			 tags, source, created_by, validated_by_math, version, is_active, metadata)
 			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
@@ -117,7 +117,7 @@ func ListQuestionsHandler(db *pgxpool.Pool) http.HandlerFunc {
 		query := `SELECT id, statement, latex, question_type, difficulty, concept_id,
 			competencies, expected_answer, answer_options, explanation, explanation_latex,
 			tags, source, created_by, validated_by_math, version, is_active, metadata, created_at
-			FROM questions WHERE is_active = true`
+			FROM question_bank WHERE is_active = true`
 
 		var args []interface{}
 		argIdx := 1
@@ -202,7 +202,7 @@ func GetQuestionHandler(db *pgxpool.Pool) http.HandlerFunc {
 			`SELECT id, statement, latex, question_type, difficulty, concept_id,
 			competencies, expected_answer, answer_options, explanation, explanation_latex,
 			tags, source, created_by, validated_by_math, version, is_active, metadata, created_at
-			FROM questions WHERE id = $1`, questionID,
+			FROM question_bank WHERE id = $1`, questionID,
 		).Scan(
 			&q.ID, &q.Statement, &q.Latex, &q.QuestionType, &q.Difficulty, &q.ConceptID,
 			&q.Competencies, &q.ExpectedAnswer, &q.AnswerOptions, &q.Explanation,
@@ -229,7 +229,7 @@ func UpdateQuestionHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFun
 			`SELECT id, statement, latex, question_type, difficulty, concept_id,
 			competencies, expected_answer, answer_options, explanation, explanation_latex,
 			tags, source, created_by, validated_by_math, version, is_active, metadata, created_at
-			FROM questions WHERE id = $1`, questionID,
+			FROM question_bank WHERE id = $1`, questionID,
 		).Scan(
 			&existing.ID, &existing.Statement, &existing.Latex, &existing.QuestionType,
 			&existing.Difficulty, &existing.ConceptID, &existing.Competencies,
@@ -303,7 +303,7 @@ func UpdateQuestionHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerFun
 		existing.Version++
 
 		_, err = db.Exec(r.Context(),
-			`UPDATE questions SET
+			`UPDATE question_bank SET
 			 statement = $1, latex = $2, question_type = $3, difficulty = $4, concept_id = $5,
 			 competencies = $6, expected_answer = $7, answer_options = $8, explanation = $9,
 			 explanation_latex = $10, tags = $11, source = $12, validated_by_math = $13,
@@ -331,7 +331,7 @@ func DeleteQuestionHandler(db *pgxpool.Pool) http.HandlerFunc {
 		questionID := chi.URLParam(r, "questionID")
 
 		tag, err := db.Exec(r.Context(),
-			`UPDATE questions SET is_active = false WHERE id = $1`, questionID,
+			`UPDATE question_bank SET is_active = false WHERE id = $1`, questionID,
 		)
 		if err != nil {
 			log.Printf("[QUESTION] soft delete failed: %v", err)
@@ -358,7 +358,7 @@ func ValidateQuestionHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerF
 			`SELECT id, statement, latex, question_type, difficulty, concept_id,
 			competencies, expected_answer, answer_options, explanation, explanation_latex,
 			tags, source, created_by, validated_by_math, version, is_active, metadata, created_at
-			FROM questions WHERE id = $1`, questionID,
+			FROM question_bank WHERE id = $1`, questionID,
 		).Scan(
 			&q.ID, &q.Statement, &q.Latex, &q.QuestionType, &q.Difficulty, &q.ConceptID,
 			&q.Competencies, &q.ExpectedAnswer, &q.AnswerOptions, &q.Explanation,
@@ -381,7 +381,7 @@ func ValidateQuestionHandler(db *pgxpool.Pool, cfg *config.Config) http.HandlerF
 		}
 
 		_, err = db.Exec(r.Context(),
-			`UPDATE questions SET validated_by_math = $1 WHERE id = $2`,
+			`UPDATE question_bank SET validated_by_math = $1 WHERE id = $2`,
 			validated, questionID,
 		)
 		if err != nil {

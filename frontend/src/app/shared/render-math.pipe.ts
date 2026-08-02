@@ -1,5 +1,6 @@
 import { Pipe, PipeTransform } from '@angular/core';
 import katex from 'katex';
+import DOMPurify from 'dompurify';
 
 @Pipe({ name: 'renderMath', standalone: true })
 export class RenderMathPipe implements PipeTransform {
@@ -38,6 +39,8 @@ export class RenderMathPipe implements PipeTransform {
     result = result.replace(/\n\n+/g, '</p><p>');
     result = result.replace(/\n/g, '<br>');
 
-    return `<p>${result}</p>`;
+    // Sanitize the final HTML: non-math text and LaTeX fallbacks must not be
+    // able to inject markup into the page (stored-XSS via AI/backend output).
+    return DOMPurify.sanitize(`<p>${result}</p>`);
   }
 }

@@ -1,7 +1,7 @@
 package api
 
 import (
-	"context"
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -18,11 +18,32 @@ func ExportRoutes(db *pgxpool.Pool) func(r chi.Router) {
 	}
 }
 
+func writeCSV(w http.ResponseWriter, filename string, records [][]string) {
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
+	for _, record := range records {
+		if err := writer.Write(record); err != nil {
+			http.Error(w, `{"error":"failed to build CSV"}`, http.StatusInternalServerError)
+			return
+		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		http.Error(w, `{"error":"failed to build CSV"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", buf.Len()))
+	w.Write(buf.Bytes())
+}
+
 func ExportAssessmentCSV(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		assessmentID := chi.URLParam(r, "assessmentID")
 
-		rows, err := db.Query(context.Background(), `
+		rows, err := db.Query(r.Context(), `
 			SELECT
 				u.name,
 				u.email,
@@ -38,23 +59,12 @@ func ExportAssessmentCSV(db *pgxpool.Pool) http.HandlerFunc {
 			ORDER BY sa.submitted_at ASC
 		`, assessmentID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"failed to query assessment results: %s"}`, err.Error()), http.StatusInternalServerError)
+			http.Error(w, `{"error":"failed to query assessment results"}`, http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="assessment_%s.csv"`, assessmentID))
-
-		writer := csv.NewWriter(w)
-		defer writer.Flush()
-
-		header := []string{"Nombre", "Email", "Puntuación", "Máximo", "Porcentaje (%)", "Aprobó (Sí/No)", "Intento", "Fecha"}
-		if err := writer.Write(header); err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"failed to write CSV header: %s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-
+		records := [][]string{{"Nombre", "Email", "Puntuación", "Máximo", "Porcentaje (%)", "Aprobó (Sí/No)", "Intento", "Fecha"}}
 		for rows.Next() {
 			var name, email string
 			var totalScore, maxScore, percentage float64
@@ -63,7 +73,7 @@ func ExportAssessmentCSV(db *pgxpool.Pool) http.HandlerFunc {
 			var submittedAt *string
 
 			if err := rows.Scan(&name, &email, &totalScore, &maxScore, &percentage, &passed, &attemptNumber, &submittedAt); err != nil {
-				http.Error(w, fmt.Sprintf(`{"error":"failed to scan row: %s"}`, err.Error()), http.StatusInternalServerError)
+				http.Error(w, `{"error":"failed to read assessment results"}`, http.StatusInternalServerError)
 				return
 			}
 
@@ -71,13 +81,12 @@ func ExportAssessmentCSV(db *pgxpool.Pool) http.HandlerFunc {
 			if passed {
 				aprobó = "Sí"
 			}
-
 			fecha := ""
 			if submittedAt != nil {
 				fecha = *submittedAt
 			}
 
-			record := []string{
+			records = append(records, []string{
 				name,
 				email,
 				fmt.Sprintf("%.2f", totalScore),
@@ -86,17 +95,14 @@ func ExportAssessmentCSV(db *pgxpool.Pool) http.HandlerFunc {
 				aprobó,
 				fmt.Sprintf("%d", attemptNumber),
 				fecha,
-			}
-			if err := writer.Write(record); err != nil {
-				http.Error(w, fmt.Sprintf(`{"error":"failed to write CSV row: %s"}`, err.Error()), http.StatusInternalServerError)
-				return
-			}
+			})
 		}
-
 		if err := rows.Err(); err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"row iteration error: %s"}`, err.Error()), http.StatusInternalServerError)
+			http.Error(w, `{"error":"failed to read assessment results"}`, http.StatusInternalServerError)
 			return
 		}
+
+		writeCSV(w, fmt.Sprintf("assessment_%s.csv", assessmentID), records)
 	}
 }
 
@@ -104,7 +110,7 @@ func ExportStudentCSV(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		studentID := chi.URLParam(r, "studentID")
 
-		rows, err := db.Query(context.Background(), `
+		rows, err := db.Query(r.Context(), `
 			SELECT
 				a.title,
 				a.assessment_type,
@@ -119,23 +125,12 @@ func ExportStudentCSV(db *pgxpool.Pool) http.HandlerFunc {
 			ORDER BY sa.submitted_at ASC
 		`, studentID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"failed to query student assessments: %s"}`, err.Error()), http.StatusInternalServerError)
+			http.Error(w, `{"error":"failed to query student assessments"}`, http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="student_%s.csv"`, studentID))
-
-		writer := csv.NewWriter(w)
-		defer writer.Flush()
-
-		header := []string{"Evaluación", "Tipo", "Puntuación", "Máximo", "Porcentaje", "Aprobó", "Fecha"}
-		if err := writer.Write(header); err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"failed to write CSV header: %s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-
+		records := [][]string{{"Evaluación", "Tipo", "Puntuación", "Máximo", "Porcentaje", "Aprobó", "Fecha"}}
 		for rows.Next() {
 			var title, assessmentType string
 			var totalScore, maxScore, percentage float64
@@ -143,7 +138,7 @@ func ExportStudentCSV(db *pgxpool.Pool) http.HandlerFunc {
 			var submittedAt *string
 
 			if err := rows.Scan(&title, &assessmentType, &totalScore, &maxScore, &percentage, &passed, &submittedAt); err != nil {
-				http.Error(w, fmt.Sprintf(`{"error":"failed to scan row: %s"}`, err.Error()), http.StatusInternalServerError)
+				http.Error(w, `{"error":"failed to read student assessments"}`, http.StatusInternalServerError)
 				return
 			}
 
@@ -151,13 +146,12 @@ func ExportStudentCSV(db *pgxpool.Pool) http.HandlerFunc {
 			if passed {
 				aprobó = "Sí"
 			}
-
 			fecha := ""
 			if submittedAt != nil {
 				fecha = *submittedAt
 			}
 
-			record := []string{
+			records = append(records, []string{
 				title,
 				assessmentType,
 				fmt.Sprintf("%.2f", totalScore),
@@ -165,17 +159,14 @@ func ExportStudentCSV(db *pgxpool.Pool) http.HandlerFunc {
 				fmt.Sprintf("%.2f", percentage),
 				aprobó,
 				fecha,
-			}
-			if err := writer.Write(record); err != nil {
-				http.Error(w, fmt.Sprintf(`{"error":"failed to write CSV row: %s"}`, err.Error()), http.StatusInternalServerError)
-				return
-			}
+			})
 		}
-
 		if err := rows.Err(); err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"row iteration error: %s"}`, err.Error()), http.StatusInternalServerError)
+			http.Error(w, `{"error":"failed to read student assessments"}`, http.StatusInternalServerError)
 			return
 		}
+
+		writeCSV(w, fmt.Sprintf("student_%s.csv", studentID), records)
 	}
 }
 
@@ -183,7 +174,7 @@ func ExportCourseCSV(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		courseID := chi.URLParam(r, "courseID")
 
-		rows, err := db.Query(context.Background(), `
+		rows, err := db.Query(r.Context(), `
 			SELECT
 				a.title AS assessment_title,
 				COUNT(sa.id) AS total_students,
@@ -199,48 +190,34 @@ func ExportCourseCSV(db *pgxpool.Pool) http.HandlerFunc {
 			ORDER BY a.title ASC
 		`, courseID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"failed to query course analytics: %s"}`, err.Error()), http.StatusInternalServerError)
+			http.Error(w, `{"error":"failed to query course analytics"}`, http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
 
-		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="course_%s.csv"`, courseID))
-
-		writer := csv.NewWriter(w)
-		defer writer.Flush()
-
-		header := []string{"Evaluación", "Total Estudiantes", "Promedio", "Tasa Aprobación"}
-		if err := writer.Write(header); err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"failed to write CSV header: %s"}`, err.Error()), http.StatusInternalServerError)
-			return
-		}
-
+		records := [][]string{{"Evaluación", "Total Estudiantes", "Promedio", "Tasa Aprobación"}}
 		for rows.Next() {
 			var title string
 			var totalStudents int
 			var avgScore, approvalRate float64
 
 			if err := rows.Scan(&title, &totalStudents, &avgScore, &approvalRate); err != nil {
-				http.Error(w, fmt.Sprintf(`{"error":"failed to scan row: %s"}`, err.Error()), http.StatusInternalServerError)
+				http.Error(w, `{"error":"failed to read course analytics"}`, http.StatusInternalServerError)
 				return
 			}
 
-			record := []string{
+			records = append(records, []string{
 				title,
 				fmt.Sprintf("%d", totalStudents),
 				fmt.Sprintf("%.2f", avgScore),
 				fmt.Sprintf("%.2f%%", approvalRate),
-			}
-			if err := writer.Write(record); err != nil {
-				http.Error(w, fmt.Sprintf(`{"error":"failed to write CSV row: %s"}`, err.Error()), http.StatusInternalServerError)
-				return
-			}
+			})
 		}
-
 		if err := rows.Err(); err != nil {
-			http.Error(w, fmt.Sprintf(`{"error":"row iteration error: %s"}`, err.Error()), http.StatusInternalServerError)
+			http.Error(w, `{"error":"failed to read course analytics"}`, http.StatusInternalServerError)
 			return
 		}
+
+		writeCSV(w, fmt.Sprintf("course_%s.csv", courseID), records)
 	}
 }

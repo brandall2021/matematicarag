@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,32 +66,26 @@ func NewAdaptiveAssessment(db *pgxpool.Pool, studentID, assessmentID string) (*A
 func (aa *AdaptiveAssessment) GetNextQuestion(db *pgxpool.Pool) (*Question, error) {
 	ctx := context.Background()
 
-	conceptFilter := ""
-	if len(aa.ConceptsCovered) > 0 {
-		conceptFilter = " AND concept_id NOT IN ("
-		for i, c := range aa.ConceptsCovered {
-			if i > 0 {
-				conceptFilter += ","
-			}
-			conceptFilter += fmt.Sprintf("'%s'", c)
-		}
-		conceptFilter += ")"
-	}
-
-	query := fmt.Sprintf(
-		`SELECT id, statement, latex, question_type, difficulty, concept_id,
+	query := `SELECT id, statement, latex, question_type, difficulty, concept_id,
 		 competencies, expected_answer, answer_options, explanation, explanation_latex,
 		 tags, source, created_by, validated_by_math, version, is_active, metadata
 		 FROM question_bank
-		 WHERE difficulty = $1 AND is_active = true%s
-		 ORDER BY RANDOM()
-		 LIMIT 1`,
-		conceptFilter,
-	)
+		 WHERE difficulty = $1 AND is_active = true`
+	args := []any{aa.CurrentLevel}
+
+	if len(aa.ConceptsCovered) > 0 {
+		placeholders := make([]string, 0, len(aa.ConceptsCovered))
+		for i := range aa.ConceptsCovered {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", i+2))
+			args = append(args, aa.ConceptsCovered[i])
+		}
+		query += " AND concept_id NOT IN (" + strings.Join(placeholders, ",") + ")"
+	}
+	query += " ORDER BY RANDOM() LIMIT 1"
 
 	var q Question
 	var createdAt *string
-	err := db.QueryRow(ctx, query, aa.CurrentLevel).Scan(
+	err := db.QueryRow(ctx, query, args...).Scan(
 		&q.ID, &q.Statement, &q.Latex, &q.QuestionType, &q.Difficulty, &q.ConceptID,
 		&q.Competencies, &q.ExpectedAnswer, &q.AnswerOptions, &q.Explanation,
 		&q.ExplanationLatex, &q.Tags, &q.Source, &q.CreatedBy, &q.ValidatedByMath,
@@ -245,8 +240,11 @@ func saveAdaptiveAssessment(db *pgxpool.Pool, aa *AdaptiveAssessment) error {
 	_, err = db.Exec(ctx,
 		`UPDATE student_assessments
 		 SET metadata = $3
-		 WHERE student_id = $1 AND assessment_id = $2 AND status = 'in_progress'
-		 ORDER BY attempt_number DESC LIMIT 1`,
+		 WHERE id = (
+			SELECT id FROM student_assessments
+			WHERE student_id = $1 AND assessment_id = $2 AND status = 'in_progress'
+			ORDER BY attempt_number DESC LIMIT 1
+		 )`,
 		aa.StudentID, aa.AssessmentID, stateJSON,
 	)
 	return err

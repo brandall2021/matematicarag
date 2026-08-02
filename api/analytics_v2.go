@@ -36,6 +36,22 @@ type CourseAnalyticsData struct {
 	AverageCompetency float64 `json:"average_competency"`
 }
 
+// canAccessStudent lets a student reach only their own analytics; teachers and
+// admins may inspect any student.
+func canAccessStudent(r *http.Request, studentID string) bool {
+	callerID, _ := r.Context().Value(UserIDKey).(string)
+	if callerID != "" && studentID == callerID {
+		return true
+	}
+	role, _ := r.Context().Value(RoleKey).(string)
+	return role == "TEACHER" || role == "ADMIN"
+}
+
+func requireTeacherOrAdmin(r *http.Request) bool {
+	role, _ := r.Context().Value(RoleKey).(string)
+	return role == "TEACHER" || role == "ADMIN"
+}
+
 func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 	return func(r chi.Router) {
 		r.Get("/student/current", func(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +71,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 
 		r.Get("/student/{studentID}", func(w http.ResponseWriter, r *http.Request) {
 			studentID := chi.URLParam(r, "studentID")
+			if !canAccessStudent(r, studentID) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			courseID := r.URL.Query().Get("course_id")
 			if courseID == "" {
 				courseID = "matematica-1"
@@ -70,6 +90,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 		})
 
 		r.Get("/course/{courseID}", func(w http.ResponseWriter, r *http.Request) {
+			if !requireTeacherOrAdmin(r) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			courseID := chi.URLParam(r, "courseID")
 
 			analytics, err := GetCourseAnalytics(db, courseID)
@@ -83,6 +107,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 
 		r.Get("/student/{studentID}/competency", func(w http.ResponseWriter, r *http.Request) {
 			studentID := chi.URLParam(r, "studentID")
+			if !canAccessStudent(r, studentID) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			courseID := r.URL.Query().Get("course_id")
 			if courseID == "" {
 				courseID = "matematica-1"
@@ -99,6 +127,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 
 		r.Get("/student/{studentID}/trend", func(w http.ResponseWriter, r *http.Request) {
 			studentID := chi.URLParam(r, "studentID")
+			if !canAccessStudent(r, studentID) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			courseID := r.URL.Query().Get("course_id")
 			if courseID == "" {
 				courseID = "matematica-1"
@@ -115,6 +147,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 
 		r.Post("/student/{studentID}/update", func(w http.ResponseWriter, r *http.Request) {
 			studentID := chi.URLParam(r, "studentID")
+			if !canAccessStudent(r, studentID) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			courseID := r.URL.Query().Get("course_id")
 			if courseID == "" {
 				courseID = "matematica-1"
@@ -129,6 +165,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 		})
 
 		r.Get("/course/{courseID}/matrix", func(w http.ResponseWriter, r *http.Request) {
+			if !requireTeacherOrAdmin(r) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			courseID := chi.URLParam(r, "courseID")
 			ctx := context.Background()
 
@@ -174,6 +214,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 		})
 
 		r.Get("/course/{courseID}/error-patterns", func(w http.ResponseWriter, r *http.Request) {
+			if !requireTeacherOrAdmin(r) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			courseID := chi.URLParam(r, "courseID")
 			ctx := context.Background()
 
@@ -222,6 +266,10 @@ func AnalyticsV2Routes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) 
 
 		r.Get("/student/{studentID}/question-history", func(w http.ResponseWriter, r *http.Request) {
 			studentID := chi.URLParam(r, "studentID")
+			if !canAccessStudent(r, studentID) {
+				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+				return
+			}
 			ctx := context.Background()
 
 			rows, err := db.Query(ctx, `

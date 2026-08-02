@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/brandall2021/matematicarag/internal/config"
@@ -15,6 +16,11 @@ type MathRequest struct {
 	Variable   string  `json:"variable,omitempty"`
 	XMin       float64 `json:"xMin,omitempty"`
 	XMax       float64 `json:"xMax,omitempty"`
+}
+
+func mathError(w http.ResponseWriter, err error) {
+	log.Printf("[MATH] operation failed: %v", err)
+	http.Error(w, `{"error":"math operation failed"}`, http.StatusInternalServerError)
 }
 
 func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
@@ -41,7 +47,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 					json.NewEncoder(w).Encode(map[string]string{"error": "La expresión no se pudo evaluar: " + clientErr.Reason})
 					return
 				}
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -65,7 +71,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			result, err := evaluator.Evaluate(r.Context(), &evalReq)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			if studentID != "" {
@@ -87,7 +93,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			result, err := mathClient.Differentiate(req.Expression, variable)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -103,7 +109,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			result, err := mathClient.Integrate(req.Expression, variable, nil, nil)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -119,7 +125,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			result, err := mathClient.Solve(req.Expression, variable)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -131,7 +137,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			json.NewDecoder(r.Body).Decode(&req)
 			result, err := mathClient.Simplify(req.Expression)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -143,7 +149,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			json.NewDecoder(r.Body).Decode(&req)
 			result, err := mathClient.Factor(req.Expression)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -155,7 +161,7 @@ func MathRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			json.NewDecoder(r.Body).Decode(&req)
 			result, err := mathClient.Expand(req.Expression)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				mathError(w, err)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")

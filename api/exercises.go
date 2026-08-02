@@ -40,7 +40,8 @@ func ExerciseRoutes(db *pgxpool.Pool, cfg *config.Config) func(r chi.Router) {
 			}
 			ex, reason, err := GetNextExercise(r.Context(), db, cfg, studentID, courseID)
 			if err != nil {
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				log.Printf("[EXERCISE] next exercise failed: %v", err)
+				http.Error(w, `{"error":"failed to get next exercise"}`, http.StatusInternalServerError)
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")

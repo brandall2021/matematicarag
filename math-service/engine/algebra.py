@@ -1,20 +1,26 @@
 from sympy import simplify, factor, expand, collect, cancel, together
+from .parser import safe_parse
+
+def _as_expr(expr):
+    if isinstance(expr, str):
+        return safe_parse(expr)
+    return expr
 
 def simplify_expr(expr):
-    return simplify(expr)
+    return simplify(_as_expr(expr))
 
 def factor_expr(expr):
-    return factor(expr)
+    return factor(_as_expr(expr))
 
 def expand_expr(expr):
-    return expand(expr)
+    return expand(_as_expr(expr))
 
 def collect_expr(expr, var_str='x'):
     from sympy import Symbol
-    return collect(expr, Symbol(var_str))
+    return collect(_as_expr(expr), Symbol(var_str))
 
 def cancel_expr(expr):
-    return cancel(expr)
+    return cancel(_as_expr(expr))
 
 def together_expr(expr):
-    return together(expr)
+    return together(_as_expr(expr))

@@ -11,9 +11,11 @@ from engine.verify import verify_result
 from engine.arithmetic import basic_evaluate as evaluate_expression
 
 app = Flask(__name__)
-CORS(app)
+_allowed_origins = os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:8009').split(',')
+CORS(app, resources={r"/*": {"origins": [o.strip() for o in _allowed_origins if o.strip()]}})
 
 MATH_TIMEOUT = int(os.environ.get('MATH_TIMEOUT', 5))
+MAX_INPUT_LENGTH = 1000
 
 class MathTimeoutError(Exception):
     pass
@@ -32,12 +34,25 @@ def with_timeout(f):
             return result
         except MathTimeoutError:
             return jsonify({'success': False, 'error': 'Computation timed out'}), 504
-        except Exception as e:
+        except ValueError as e:
             signal.alarm(0)
             return jsonify({'success': False, 'error': str(e)}), 400
+        except Exception:
+            signal.alarm(0)
+            return jsonify({'success': False, 'error': 'Math operation failed'}), 400
         finally:
             signal.signal(signal.SIGALRM, old_handler)
     return decorated_function
+
+def _input(payload, key):
+    """Fetch a required string input with a length guard."""
+    value = payload.get(key) if isinstance(payload, dict) else None
+    if value is None:
+        return None
+    value = str(value)
+    if len(value) > MAX_INPUT_LENGTH:
+        raise ValueError('Input too long')
+    return value
 
 
 def route(path, **options):
@@ -59,9 +74,10 @@ def health():
 @with_timeout
 def math_evaluate():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    result = evaluate_expression(data['expression'])
+    result = evaluate_expression(expression)
     return jsonify({'success': True, 'result': result['result'], 'latex': result['latex']})
 
 
@@ -69,9 +85,10 @@ def math_evaluate():
 @with_timeout
 def math_simplify():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    result = simplify_expr(data['expression'])
+    result = simplify_expr(expression)
     latex = str(result)
     return jsonify({'success': True, 'result': latex, 'latex': latex})
 
@@ -80,9 +97,10 @@ def math_simplify():
 @with_timeout
 def math_factor():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    result = factor_expr(data['expression'])
+    result = factor_expr(expression)
     latex = str(result)
     return jsonify({'success': True, 'result': latex, 'latex': latex})
 
@@ -91,9 +109,10 @@ def math_factor():
 @with_timeout
 def math_expand():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    result = expand_expr(data['expression'])
+    result = expand_expr(expression)
     latex = str(result)
     return jsonify({'success': True, 'result': latex, 'latex': latex})
 
@@ -102,11 +121,12 @@ def math_expand():
 @with_timeout
 def math_differentiate():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    var = data.get('variable', 'x')
+    var = _input(data, 'variable') or 'x'
     order = data.get('order', 1)
-    result = differentiate(data['expression'], var, order)
+    result = differentiate(expression, var, order)
     return jsonify({'success': True, 'result': result, 'latex': result})
 
 
@@ -114,12 +134,13 @@ def math_differentiate():
 @with_timeout
 def math_integrate():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    var = data.get('variable', 'x')
+    var = _input(data, 'variable') or 'x'
     lower = data.get('lower')
     upper = data.get('upper')
-    result = integrate(data['expression'], var, lower, upper)
+    result = integrate(expression, var, lower, upper)
     return jsonify({'success': True, 'result': result, 'latex': result})
 
 
@@ -127,12 +148,13 @@ def math_integrate():
 @with_timeout
 def math_limit():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    var = data.get('variable', 'x')
-    target = data.get('target', '0')
-    direction = data.get('direction', '+')
-    result = compute_limit(data['expression'], var, target, direction)
+    var = _input(data, 'variable') or 'x'
+    target = _input(data, 'target') or '0'
+    direction = _input(data, 'direction') or '+'
+    result = compute_limit(expression, var, target, direction)
     return jsonify({'success': True, 'result': result, 'latex': result})
 
 
@@ -144,11 +166,12 @@ def math_solve():
     if equations:
         variables = data.get('variables', 'x, y')
         result = solve_system(equations, variables)
-    elif data and 'expression' in data:
-        var = data.get('variable', 'x')
-        result = solve_equation(data['expression'], var)
     else:
-        return jsonify({'success': False, 'error': 'Expression or equations is required'}), 400
+        expression = _input(data, 'expression')
+        if not expression:
+            return jsonify({'success': False, 'error': 'Expression or equations is required'}), 400
+        var = _input(data, 'variable') or 'x'
+        result = solve_equation(expression, var)
     result['success'] = True
     return jsonify(result)
 
@@ -171,10 +194,11 @@ def math_matrix():
 @with_timeout
 def math_verify():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    expected = data.get('expected')
-    result = verify_result(data['expression'], expected)
+    expected = _input(data, 'expected')
+    result = verify_result(expression, expected)
     result['success'] = True
     return jsonify(result)
 
@@ -183,10 +207,11 @@ def math_verify():
 @with_timeout
 def math_validate_exercise():
     data = request.get_json()
-    if not data or 'expression' not in data:
+    expression = _input(data, 'expression')
+    if not expression:
         return jsonify({'success': False, 'error': 'Expression is required'}), 400
-    expected = data.get('expected', '')
-    result = verify_result(data['expression'], expected)
+    expected = _input(data, 'expected') or ''
+    result = verify_result(expression, expected)
     result['success'] = True
     return jsonify(result)
 

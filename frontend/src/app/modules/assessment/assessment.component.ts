@@ -15,6 +15,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { AuthService } from '../../core/services/auth.service';
+import { SafeHtmlPipe } from '../../shared/safe-html.pipe';
 import {
   AssessmentService, Assessment, AssessmentQuestion,
   StudentAssessment, StudentAnswer
@@ -29,7 +30,7 @@ type PageMode = 'list' | 'taking' | 'results' | 'teacher-list' | 'create-form' |
     CommonModule, FormsModule, MatCardModule, MatButtonModule, MatIconModule,
     MatProgressBarModule, MatRadioModule, MatInputModule, MatFormFieldModule,
     MatTabsModule, MatChipsModule, MatSnackBarModule, MatSelectModule,
-    MatSlideToggleModule
+    MatSlideToggleModule, SafeHtmlPipe
   ],
   template: `
     @if (loading()) {
@@ -345,7 +346,7 @@ type PageMode = 'list' | 'taking' | 'results' | 'teacher-list' | 'create-form' |
             </mat-card-header>
             <mat-card-content>
               @if (currentQuestion()!.latex) {
-                <div class="question-latex" [innerHTML]="currentQuestion()!.latex"></div>
+                <div class="question-latex" [innerHTML]="(currentQuestion()!.latex ?? '') | safeHtml"></div>
               } @else {
                 <p class="question-statement">{{ currentQuestion()!.statement }}</p>
               }

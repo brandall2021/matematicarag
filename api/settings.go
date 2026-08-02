@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -115,9 +116,10 @@ func SettingsRoutes(db *pgxpool.Pool) func(r chi.Router) {
 			}
 
 			if callErr != nil {
+				log.Printf("[SETTINGS] provider connection check failed: %v", callErr)
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]interface{}{
-					"ok": false, "error": callErr.Error(),
+					"ok": false, "error": "no se pudo conectar con el proveedor de IA",
 				})
 				return
 			}
