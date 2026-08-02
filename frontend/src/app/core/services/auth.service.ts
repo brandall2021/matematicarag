@@ -46,6 +46,16 @@ export class AuthService {
     return this.tokenSignal();
   }
 
+  setSession(token: string, refreshToken: string, user?: { id: string; email: string; name: string; lastName: string; role: string }): void {
+    localStorage.setItem('token', token);
+    localStorage.setItem('refreshToken', refreshToken);
+    this.tokenSignal.set(token);
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+      this.currentUserSignal.set(user);
+    }
+  }
+
   hasRole(...roles: string[]): boolean {
     return roles.includes(this.role());
   }

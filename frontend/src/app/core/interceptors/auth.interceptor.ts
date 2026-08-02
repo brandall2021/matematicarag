@@ -37,13 +37,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         return refresh$.pipe(
           switchMap((res) => {
             refresh$ = null;
-            localStorage.setItem('token', res.token);
-            localStorage.setItem('refreshToken', res.refreshToken);
-            auth['tokenSignal'].set(res.token);
-            if (res.user) {
-              localStorage.setItem('user', JSON.stringify(res.user));
-              auth['currentUserSignal'].set(res.user);
-            }
+            auth.setSession(res.token, res.refreshToken, res.user);
             const newReq = req.clone({ setHeaders: { Authorization: `Bearer ${res.token}` } });
             return next(newReq);
           })

@@ -42,6 +42,7 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            }
           }
         },
         "serve": {
@@ -54,10 +55,13 @@
         },
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
-          "options": {"polyfills": ["zone.js", "zone.js/testing"], "tsConfig": "tsconfig.spec.json"}
+          "options": {
+            "polyfills": ["zone.js", "zone.js/testing"],
+            "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.js"
+          }
         }
       }
     }
   }
-}
 }
