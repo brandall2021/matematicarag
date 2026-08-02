@@ -80,7 +80,7 @@ type Phase = 'idle' | 'thinking' | 'done';
                 <mat-icon class="msg-badge-icon">smart_toy</mat-icon>
                 Agente
                 @if (msg.strategy) {
-                  <span class="strategy-tag">{{ msg.strategy }}</span>
+                  <span class="strategy-tag">{{ strategyLabel(msg.strategy) }}</span>
                 }
                 @if (msg.confidence !== undefined) {
                   <span class="confidence-tag" [style.color]="confidenceColor(msg.confidence)">
@@ -348,6 +348,19 @@ export class AgentChatComponent implements AfterViewInit, OnDestroy {
     if (score >= 0.9) return '#4caf50';
     if (score >= 0.7) return '#ff9800';
     return '#9e9e9e';
+  }
+
+  strategyLabel(strategy: string): string {
+    const labels: Record<string, string> = {
+      'DIRECT': 'Explicación directa',
+      'SOCRATIC': 'Método socrático',
+      'GUIDED': 'Aprendizaje guiado',
+      'EXAMPLE_FIRST': 'Primero un ejemplo',
+      'STEP_BY_STEP': 'Paso a paso',
+      'REMEDIAL': 'Refuerzo de conceptos',
+      'CHALLENGE': 'Modo desafío',
+    };
+    return labels[strategy] || strategy;
   }
 
   toggleSource(id: string) {

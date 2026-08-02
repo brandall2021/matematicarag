@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"strings"
 	"testing"
 )
 
@@ -235,5 +236,61 @@ func TestToolRegistry_Execute(t *testing.T) {
 	}
 	if tc.Result["key"] != "value" {
 		t.Errorf("Execute() result[key] = %v, want 'value'", tc.Result["key"])
+	}
+}
+
+func TestFallbackResponse_UsesRagContent(t *testing.T) {
+	rg := NewResponseGenerator(nil, &AgentConfig{})
+
+	plan := &Plan{
+		Intent:   IntentExplainConcept,
+		Strategy: StrategyExampleFirst,
+		Steps: []PlannedStep{
+			{Tool: "rag_search", Purpose: "buscar material académico relevante"},
+		},
+	}
+
+	toolResults := []*ToolCall{
+		{
+			Tool: "rag_search",
+			Result: map[string]any{
+				"results": []any{
+					map[string]any{
+						"content": "La integral definida de una función representa el área bajo la curva.",
+						"score":   0.95,
+					},
+					map[string]any{
+						"content": "Se calcula mediante el teorema fundamental del cálculo.",
+						"score":   0.90,
+					},
+				},
+			},
+		},
+	}
+
+	resp := rg.fallbackResponse("¿qué es una integral definida?", toolResults, NewCitationManager(), plan)
+
+	if !strings.Contains(resp.Response, "integral definida") {
+		t.Errorf("fallback response missing query context: %q", resp.Response)
+	}
+	if !strings.Contains(resp.Response, "Material de referencia") {
+		t.Errorf("fallback response missing reference material header: %q", resp.Response)
+	}
+	if !strings.Contains(resp.Response, "área bajo la curva") {
+		t.Errorf("fallback response does not include RAG content: %q", resp.Response)
+	}
+	if strings.Contains(resp.Response, "Claro, vamos a revisarlo") {
+		t.Errorf("theory fallback should not use the generic opener: %q", resp.Response)
+	}
+}
+
+func TestFallbackResponse_EmptyRag(t *testing.T) {
+	rg := NewResponseGenerator(nil, &AgentConfig{})
+
+	plan := &Plan{Intent: IntentExplainConcept, Strategy: StrategyDirect}
+	resp := rg.fallbackResponse("¿qué es una derivada?", nil, NewCitationManager(), plan)
+
+	if strings.Contains(resp.Response, "Material de referencia") {
+		t.Errorf("fallback should not show reference material when RAG is empty: %q", resp.Response)
 	}
 }

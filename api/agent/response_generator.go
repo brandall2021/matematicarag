@@ -91,14 +91,28 @@ Instrucciones:
 
 func (rg *ResponseGenerator) fallbackResponse(query string, toolResults []*ToolCall, citationMgr *CitationManager, plan *Plan) *AgentResponse {
 	var sb strings.Builder
-	sb.WriteString("Claro, vamos a revisarlo.\n\n")
+
+	switch plan.Intent {
+	case IntentAskTheory, IntentExplainConcept, IntentReviewTopic, IntentSummarizeMaterial:
+		sb.WriteString("Aquí tienes material que responde tu consulta sobre \"" + strings.TrimSpace(query) + "\":\n\n")
+	case IntentSolveExercise, IntentCheckAnswer, IntentCheckProcedure:
+		sb.WriteString("Claro, vamos a revisarlo paso a paso.\n\n")
+	default:
+		sb.WriteString("Claro, vamos a revisarlo.\n\n")
+	}
+
+	ragResults := make([]map[string]any, 0)
 
 	for _, tc := range toolResults {
 		switch tc.Tool {
 		case "rag_search":
 			if tc.Error == "" && tc.Result != nil {
-				if results, ok := tc.Result["results"].([]any); ok && len(results) > 0 {
-					sb.WriteString("He encontrado material relevante sobre el tema.\n\n")
+				if results, ok := tc.Result["results"].([]any); ok {
+					for _, r := range results {
+						if item, ok := r.(map[string]any); ok {
+							ragResults = append(ragResults, item)
+						}
+					}
 				}
 			}
 		case "math_solve":
@@ -137,6 +151,28 @@ func (rg *ResponseGenerator) fallbackResponse(query string, toolResults []*ToolC
 				}
 			}
 		}
+	}
+
+	if len(ragResults) > 0 {
+		sb.WriteString("**Material de referencia:**\n")
+		shown := 0
+		for _, item := range ragResults {
+			if shown >= 3 {
+				break
+			}
+			content, _ := item["content"].(string)
+			content = strings.TrimSpace(content)
+			if content == "" {
+				continue
+			}
+			const maxLen = 800
+			if len(content) > maxLen {
+				content = content[:maxLen] + "…"
+			}
+			sb.WriteString(fmt.Sprintf("\n> %s\n", content))
+			shown++
+		}
+		sb.WriteString("\n")
 	}
 
 	if plan.Strategy == StrategySocratic || plan.Strategy == StrategyGuided {
