@@ -1,10 +1,10 @@
 import re
 from sympy import (
-    Abs, Add, E, Eq, Float, Function, Ge, Gt, I, Integer, Le, Lt, Matrix,
-    Mul, Ne, Pow, Rational, Symbol, acos, acosh, acot, acsc, asec, asin,
-    asinh, atan, atanh, ceiling, cos, cosh, cot, csc, exp, factorial, floor,
-    gamma, im, log, oo, parse_expr, pi, re as sympy_re, sec, sign, sin,
-    sinh, sqrt, tan, tanh,
+    Abs, Add, E, Eq, Float, Function, Ge, Gt, I, Integer, Integral, Le, Lt,
+    Matrix, Mul, Ne, Pow, Rational, Symbol, acos, acosh, acot, acsc, asec,
+    asin, asinh, atan, atanh, ceiling, cos, cosh, cot, csc, exp, factorial,
+    floor, gamma, im, log, oo, parse_expr, pi, re as sympy_re, sec, sign,
+    sin, sinh, sqrt, tan, tanh,
 )
 from sympy.parsing.sympy_parser import (
     convert_xor,
@@ -81,11 +81,13 @@ _SAFE_GLOBALS = {
     'abs': Abs, 'Abs': Abs, 're': sympy_re, 'im': im, 'sign': sign,
     'floor': floor, 'ceiling': ceiling, 'factorial': factorial,
     'gamma': gamma, 'Rational': Rational, 'Integer': Integer, 'Float': Float,
-    'pi': pi, 'oo': oo, 'inf': oo, 'E': E, 'I': I,
+    'pi': pi, 'oo': oo, 'inf': oo, 'E': E, 'I': I, 'e': E,
     'Eq': Eq, 'Ne': Ne, 'Le': Le, 'Lt': Lt, 'Ge': Ge, 'Gt': Gt,
     'Matrix': Matrix,
     # Core sympy nodes required by the parser transformations.
     'Add': Add, 'Mul': Mul, 'Pow': Pow, 'Symbol': Symbol, 'Function': Function,
+    # Integral, produced by the \int LaTeX translation (safe: integral only).
+    'Integral': Integral,
 }
 
 _TRANSFORMATIONS = standard_transformations + (
@@ -195,6 +197,46 @@ def _append(out, token, atom=False):
     out.append((token, atom))
 
 
+# Splits `\int ... \mathrm{d}x` / `\int ... dx` into (integrand, var, tail).
+# `tail` keeps anything after the differential (e.g. `+ 5`) for reprocessing.
+_DIFFERENTIAL_RE = re.compile(
+    r'(?P<integrand>.*?)'
+    r'(?P<diff>\\mathrm\{d\}|\\operatorname\{d\}|\\text\{d\}|d)'
+    r'(?P<var>[a-zA-Z])(?P<tail>.*)',
+    re.DOTALL,
+)
+
+
+def _split_differential(rest):
+    m = _DIFFERENTIAL_RE.match(rest)
+    if m:
+        return m.group('integrand'), m.group('var'), m.group('tail')
+    return rest, '', ''
+
+
+def _integral_bound(raw):
+    r"""Translate a LaTeX bound (e.g. `\infty` or `0`) to sympy text."""
+    if not raw:
+        return ''
+    if raw.strip() == 'infty':
+        return 'oo'
+    return latex_to_sympy(raw)
+
+
+def _read_bound(s, i):
+    r"""Read an integral bound after `_`/`^`: a group, an alnum token or a `\cmd`."""
+    while i < len(s) and s[i].isspace():
+        i += 1
+    if i < len(s) and s[i] == '{':
+        return _read_group(s, i)
+    if i < len(s) and s[i] == '\\':
+        j = i + 1
+        while j < len(s) and s[j].isalpha():
+            j += 1
+        return s[i:j], j
+    return _next_arg(s, i)
+
+
 def latex_to_sympy(s):
     s = s.strip()
     s = re.sub(r'^\$\$?', '', s)
@@ -210,6 +252,8 @@ def latex_to_sympy(s):
             j = i + 1
             while j < n and s[j].isalpha():
                 j += 1
+            if j == i + 1 and j < n:
+                j += 1  # single non-alpha command: \!, \,, \{, \', \ etc.
             cmd = s[i:j]
             name = cmd[1:] if len(cmd) > 1 else ''
 
@@ -222,6 +266,35 @@ def latex_to_sympy(s):
                     continue
                 out.append((cmd, False))
                 i = j
+                continue
+
+            if cmd == '\\int':
+                k = j
+                while s.startswith('\\limits', k):
+                    k += len('\\limits')
+                lower, upper = '', ''
+                if k < n and s[k] == '_':
+                    k += 1
+                    lower, k = _read_bound(s, k)
+                if k < n and s[k] == '^':
+                    k += 1
+                    upper, k = _read_bound(s, k)
+                integrand, var, tail = _split_differential(s[k:])
+                integrand_s = latex_to_sympy(integrand).strip() or '1'
+                var_s = latex_to_sympy(var) if var else 'x'
+                lower_s = _integral_bound(lower)
+                upper_s = _integral_bound(upper)
+                if lower or upper:
+                    bounds = '(' + var_s + ', ' + (lower_s or '0') + ', ' + (upper_s or 'oo') + ')'
+                    _append(out, 'Integral(' + integrand_s + ', ' + bounds + ')', atom=True)
+                else:
+                    _append(out, 'Integral(' + integrand_s + ', ' + var_s + ')', atom=True)
+                if tail:
+                    s = tail
+                    n = len(s)
+                    i = 0
+                else:
+                    i = n
                 continue
 
             if cmd == '\\sqrt':
