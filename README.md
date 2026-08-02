@@ -178,7 +178,7 @@ matematicarag/
 │       ├── audit_logger.go         # Registro de ejecuciones
 │       └── intent_classifier.go    # Clasificacion de intencion del agente
 ├── math-service/
-│   ├── app.py                      # Flask API (12 endpoints matematicos)
+│   ├── app.py                      # Flask API (13 endpoints matematicos)
 │   ├── Dockerfile                  # Python 3.11-slim + SymPy
 │   ├── requirements.txt            # flask, sympy, gunicorn
 │   ├── engine/
@@ -605,6 +605,7 @@ Response:
 | POST | `/api/math/simplify` | Simplificar |
 | POST | `/api/math/factor` | Factorizar |
 | POST | `/api/math/expand` | Expandir |
+| POST | `/api/math/plot` | Graficar funcion (puntos x/y) |
 
 ### Math Service (interno — Python)
 
@@ -624,6 +625,7 @@ Endpoints del microservicio Python (no expuestos directamente al frontend):
 | POST | `/math/matrix` | Operaciones con matrices |
 | POST | `/math/verify` | Verificar resultado |
 | POST | `/math/validate-exercise` | Validar ejercicio generado |
+| POST | `/math/plot` | Graficar funcion → `{ points: [{x, y}] }`, `y` es `null` en discontinuidades |
 
 ### Documents (requiere auth)
 
